@@ -1,0 +1,10 @@
+[package]
+name = "sukyana"
+version = "1.0.0"
+authors = ["Jannis Schoepplenberg <jschoe@proton.me>"]
+edition = "2021"
+rust-version = "1.73"
+
+[dependencies]
+itertools = "0.13.0"
+tokio = { version = "1.38.0", features = ["full"] }
