@@ -16,8 +16,28 @@ use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
     process::Command,
+    str::FromStr,
     time::Duration,
 };
+
+// Constants based on the operating system.
+cfg_if::cfg_if! {
+    if #[cfg(target_os = "windows")] {
+        const NEIGHBOR_COMMAND: &str = "powershell";
+        const NEIGHBOR_ARGS: [&str; 1] = ["Get-NetNeighbor"];
+        const IP_INDEX: usize = 1;
+        const MAC_INDEX: usize = 2;
+        const SKIP: usize = 2;
+    } else if #[cfg(target_os = "linux")] {
+        const NEIGHBOR_COMMAND: &str = "bash";
+        const NEIGHBOR_ARGS: [&str; 1] = ["-c ip neighbour"];
+        const IP_INDEX: usize = 0;
+        const MAC_INDEX: usize = 4;
+        const SKIP: usize = 0;
+    } else {
+        compile_error!("Unsupported operating system");
+    }
+}
 
 pub struct Arp;
 
@@ -40,19 +60,19 @@ impl Arp {
         };
 
         // Create the ARP packet.
-        let mut arp_buffer = [0u8; 28];
-        let mut arp_packet = MutableArpPacket::new(&mut arp_buffer).unwrap();
+        let mut arp_packet = [0u8; 28];
+        let mut arp_header = MutableArpPacket::new(&mut arp_packet).unwrap();
 
         // Set the ARP packet fields.
-        arp_packet.set_hardware_type(ArpHardwareTypes::Ethernet);
-        arp_packet.set_protocol_type(EtherTypes::Ipv4);
-        arp_packet.set_hw_addr_len(6);
-        arp_packet.set_proto_addr_len(4);
-        arp_packet.set_operation(ArpOperations::Request);
-        arp_packet.set_sender_hw_addr(src_mac);
-        arp_packet.set_sender_proto_addr(src_ip);
-        arp_packet.set_target_hw_addr(MacAddr::zero());
-        arp_packet.set_target_proto_addr(dest_ip);
+        arp_header.set_hardware_type(ArpHardwareTypes::Ethernet);
+        arp_header.set_protocol_type(EtherTypes::Ipv4);
+        arp_header.set_hw_addr_len(6);
+        arp_header.set_proto_addr_len(4);
+        arp_header.set_operation(ArpOperations::Request);
+        arp_header.set_sender_hw_addr(src_mac);
+        arp_header.set_sender_proto_addr(src_ip);
+        arp_header.set_target_hw_addr(MacAddr::zero());
+        arp_header.set_target_proto_addr(dest_ip);
 
         // Set the ethertype for the Ethernet frame.
         let ethernet_type = EtherTypes::Arp;
@@ -79,73 +99,61 @@ impl Arp {
             interface,
             MacAddr::broadcast(),
             ethernet_type,
-            &arp_buffer,
+            &arp_packet,
             layer,
             0,
         )?;
 
         // Extract the MAC address from the ARP response.
         match response {
-            Some(response_buffer) => Ok((Arp::get_mac_address(&response_buffer), rtt)),
+            Some(packet) => Ok((Arp::get_mac_address(&packet), rtt)),
             None => Ok((None, None)),
         }
     }
+
     /// Searches the ARP cache to retrieve the MAC address of the given IP address.
     pub fn search_neighbor_cache(ip_addr: IpAddr) -> Result<Option<MacAddr>> {
-        let respone = Arp::neighbor_cache()?;
-        match respone {
-            Some(map) => {
-                for (ip, mac) in map {
-                    if ip == ip_addr {
-                        return Ok(Some(mac));
-                    }
-                }
-                Ok(None)
-            }
-            None => Ok(None),
-        }
+        let response = Arp::neighbor_cache()?;
+        Ok(response.and_then(|map| {
+            map.into_iter()
+                .find_map(|(ip, mac)| if ip == ip_addr { Some(mac) } else { None })
+        }))
     }
 
-    /// The neighbor cache, also known as the ARP cache.
+    /// Retrieves the neighbor cache (also known as the ARP cache).
     ///
-    /// Retrieves the information of each on-link neighbor.
+    /// Issues a `Command` to output the neighbor cache and parse it.
     ///
-    /// Includes the IP address and MAC address of each neighbor.
+    /// Returns the IP address and MAC address of each on-link neighbor as a `HashMap`.
     pub fn neighbor_cache() -> Result<Option<HashMap<IpAddr, MacAddr>>> {
-        if cfg!(target_os = "windows") {
-            let command = Command::new("powershell")
-                .args(["Get-NetNeighbor"])
-                .output()?;
-            let output = String::from_utf8_lossy(&command.stdout);
-            let lines: Vec<&str> = output.split("\r\n").filter(|v| v.len() > 0).collect();
-            let mut ret: HashMap<IpAddr, MacAddr> = HashMap::new();
-            for line in lines[2..].to_vec() {
-                let l_split: Vec<&str> = line.split(" ").filter(|v| v.len() > 0).collect();
-                if l_split.len() >= 5 {
-                    let ip_str = l_split[1];
-                    let mac_str = l_split[2].replace("-", ":");
-                    let ip: IpAddr = ip_str.parse()?;
-                    let mac: MacAddr = mac_str.parse()?;
-                    ret.insert(ip, mac);
+        let output = Command::new(NEIGHBOR_COMMAND)
+            .args(&NEIGHBOR_ARGS)
+            .output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let lines = stdout.lines();
+        let mut cache: HashMap<IpAddr, MacAddr> = HashMap::new();
+        for line in lines.skip(SKIP) {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() > MAC_INDEX {
+                if let (Ok(ip), Ok(mac)) = (
+                    parts[IP_INDEX].parse(),
+                    MacAddr::from_str(&parts[MAC_INDEX].replace('-', ":")),
+                ) {
+                    cache.insert(ip, mac);
                 }
             }
-            return Ok(Some(ret));
-        } else {
-            Ok(None)
         }
+        Ok(Some(cache))
     }
 
     /// Extracts the MAC address from an ARP packet.
     pub fn get_mac_address(packet: &[u8]) -> Option<MacAddr> {
         let response = EthernetPacket::new(packet)?;
-        println!("{:?}", response);
-        println!("{:?}", response.get_ethertype());
-        match response.get_ethertype() {
-            EtherTypes::Arp => {
-                let arp_packet = ArpPacket::new(response.payload())?;
-                Some(arp_packet.get_sender_hw_addr())
-            }
-            _ => None, // Not an ARP packet.
+        if response.get_ethertype() == EtherTypes::Arp {
+            let arp_packet = ArpPacket::new(response.payload())?;
+            Some(arp_packet.get_sender_hw_addr())
+        } else {
+            None
         }
     }
 }
@@ -156,11 +164,17 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
     #[test]
-    fn test_send_request() -> Result<()> {
+    fn test_send_request_and_get_mac() -> Result<()> {
+        // Local interface IP address.
         let src_ip = Ipv4Addr::new(192, 168, 178, 26);
+
+        // Router IP address.
         let router_ip = NetworkLayer::system_route()?;
-        // TODO: Implement ARP layer matching.
+
+        // Send an ARP request to the router. Parses the MAC address from the response.
         let (response, rtt) = Arp::send_request(src_ip, router_ip).unwrap();
+
+        // Ensure we received a response and round-trip time.
         assert!(response.is_some());
         assert!(rtt.is_some());
         Ok(())
@@ -168,8 +182,13 @@ mod tests {
 
     #[test]
     fn test_search_neighbor_cache() -> Result<()> {
+        // Router IP address.
         let router_ip = IpAddr::V4(NetworkLayer::system_route()?);
+
+        // Search the neighbor cache for the router.
         let result = Arp::search_neighbor_cache(router_ip).unwrap();
+
+        // Ensure the router is found in the neighbor cache.
         assert!(result.is_some());
         Ok(())
     }

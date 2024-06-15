@@ -7,6 +7,7 @@ rust-version = "1.73"
 
 [dependencies]
 anyhow = "1.0.86"
+cfg-if = "1.0.0"
 env_logger = "0.11.3"
 futures = "0.3.30"
 itertools = "0.13.0"
@@ -14,4 +15,5 @@ log = "0.4.21"
 pnet = "0.35.0"
 rand = "0.8.5"
 serde = { version = "^1", features = ["derive"] }
+thiserror = "1.0.61"
 tokio = { version = "1.38.0", features = ["full"] }

@@ -24,61 +24,37 @@ impl Tcp {
         dest_ip: Ipv4Addr,
         dest_port: u16,
     ) -> [u8; IPV4_HEADER_SIZE + TCP_HEADER_SIZE + TCP_DATA_SIZE] {
-        // Generate a random number generator.
         let mut rng = rand::thread_rng();
+        let mut tcp_packet = [0u8; IPV4_HEADER_SIZE + TCP_HEADER_SIZE + TCP_DATA_SIZE];
 
-        // Create IP header.
-        let mut packet_buffer = [0u8; IPV4_HEADER_SIZE + TCP_HEADER_SIZE + TCP_DATA_SIZE];
-        let mut ip_header = MutableIpv4Packet::new(&mut packet_buffer).unwrap();
-        // IPv4 first header field is always 4.
+        let mut ip_header = MutableIpv4Packet::new(&mut tcp_packet).unwrap();
         ip_header.set_version(4);
-        // Minimum header length is 5, which indicates 20 bytes.
         ip_header.set_header_length(5);
-        // Sender of the packet.
         ip_header.set_source(src_ip);
-        // Receiver of the packet.
         ip_header.set_destination(dest_ip);
-        // Defines the entire packet size in bytes. Minimum size is 20 bytes. Maximum size is 65,535 bytes.
         ip_header.set_total_length((IPV4_HEADER_SIZE + TCP_HEADER_SIZE + TCP_DATA_SIZE) as u16);
-        // ID field is a unique 16-bit identifier for the packet.
         ip_header.set_identification(rng.gen());
-        // Controls fragmentation. DF flag causes packet to be drauped if it cannot be sent without fragmentation.
         ip_header.set_flags(Ipv4Flags::DontFragment);
-        // TTL is decremented by one each time the packet is processed by a router.
-        // If TTL reaches 0, the packet is discarded and an ICMP time exceeded is sent back to the sender.
         ip_header.set_ttl(TTL);
-        // Sets the protocol field to TCP (6).
         ip_header.set_next_level_protocol(IpNextHeaderProtocols::Tcp);
-        // Checksum used to verify the integrity of the header. Receiver recalculates the checksum and compares it.
         let ip_checksum = ipv4::checksum(&ip_header.to_immutable());
         ip_header.set_checksum(ip_checksum);
 
-        // Create TCP header.
-        let mut tcp_header = MutableTcpPacket::new(&mut packet_buffer[IPV4_HEADER_SIZE..]).unwrap();
-        // Sending port of the packet.
+        let mut tcp_header = MutableTcpPacket::new(&mut tcp_packet[IPV4_HEADER_SIZE..]).unwrap();
         tcp_header.set_source(src_port);
-        // Receiving port of the packet.
         tcp_header.set_destination(dest_port);
-        // The initial sequence number since the SYN flag is set.
         tcp_header.set_sequence(rng.gen());
-        // The acknowledgment number.
         tcp_header.set_acknowledgement(rng.gen());
-        // Senders should always set this field to 0.
         tcp_header.set_reserved(0);
-        // Indicate that this packet is a SYN packet.
         tcp_header.set_flags(TcpFlags::SYN);
-        // We set urgent pointer to 0.
         tcp_header.set_urgent_ptr(0);
-        // Specifies the number of window size units that we are (sender) willing to receive back.
         tcp_header.set_window(1024);
-        // Specifies the size of the TCP header in 32-bit words. Minimum size is 5 words. Maximum size is 15 words.
         tcp_header.set_data_offset(5);
-        // Checksum used to verify the integrity of the TCP header.
         let tcp_checksum =
             packet::tcp::ipv4_checksum(&tcp_header.to_immutable(), &src_ip, &dest_ip);
         tcp_header.set_checksum(tcp_checksum);
 
-        packet_buffer
+        tcp_packet
     }
 
     pub fn send_syn_packet(
@@ -143,7 +119,7 @@ mod tests {
         let dest_ip = Ipv4Addr::new(192, 168, 1, 2);
         let dest_port = 80;
 
-        // Build the SYN packet.
+        // Build a SYN packet.
         let packet = Tcp::build_syn_packet(src_ip, src_port, dest_ip, dest_port);
 
         // Verify the IP header.
@@ -173,13 +149,11 @@ mod tests {
         let dest_ip = Ipv4Addr::new(142, 251, 209, 131);
         let dest_port = 80;
 
-        // Send the SYN packet.
+        // Send a SYN packet.
         let (packet, rtt) = Tcp::send_syn_packet(1, src_ip, src_port, dest_ip, dest_port)?;
 
         // Ensure we have received a response packet.
-        if let Some(packet) = packet {
-            assert!(Ipv4Packet::new(&packet).is_some());
-        }
+        assert!(packet.is_some());
 
         // Ensure we have received a round-trip time.
         assert!(rtt.is_some());

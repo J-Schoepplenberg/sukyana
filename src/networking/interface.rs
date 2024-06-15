@@ -5,38 +5,27 @@ use std::net::{IpAddr, Ipv4Addr};
 pub struct Interface;
 
 impl Interface {
-    /// Attempts to find the network interface that has the given IP address.
-    pub fn from_ip(src_ip: Ipv4Addr) -> Option<NetworkInterface> {
-        for interface in datalink::interfaces() {
-            for ip in &interface.ips {
-                match ip.ip() {
-                    IpAddr::V4(ipv4) => {
-                        if ipv4 == src_ip {
-                            return Some(interface);
-                        }
-                    }
-                    _ => (),
-                }
-            }
-        }
-        None
+    /// Generalized method to find a network interface by a predicate.
+    fn find_interface<P>(predicate: P) -> Option<NetworkInterface>
+    where
+        P: Fn(&Ipv4Addr) -> bool,
+    {
+        datalink::interfaces().into_iter().find(|interface| {
+            interface.ips.iter().any(|ip| match ip.ip() {
+                IpAddr::V4(ipv4) => predicate(&ipv4),
+                _ => false,
+            })
+        })
     }
 
-    // Attempts to find the network interface that has the loopback IP address.
+    /// Attempts to find the network interface that has the given IP address.
+    pub fn from_ip(src_ip: Ipv4Addr) -> Option<NetworkInterface> {
+        Self::find_interface(|&ipv4| ipv4 == src_ip)
+    }
+
+    /// Attempts to find the network interface that has the loopback IP address.
     pub fn from_loopback() -> Option<NetworkInterface> {
-        for interface in datalink::interfaces() {
-            for ip in &interface.ips {
-                match ip.ip() {
-                    IpAddr::V4(ipv4) => {
-                        if ipv4.is_loopback() {
-                            return Some(interface);
-                        }
-                    }
-                    _ => (),
-                }
-            }
-        }
-        None
+        Self::find_interface(Ipv4Addr::is_loopback)
     }
 }
 
@@ -47,6 +36,7 @@ mod tests {
 
     #[test]
     fn test_from_ip_found() {
+        // Local interface IP address.
         let local_ip = Ipv4Addr::new(192, 168, 178, 26);
         let interface = Interface::from_ip(local_ip);
 
