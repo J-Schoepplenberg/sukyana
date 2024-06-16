@@ -42,28 +42,16 @@ cfg_if::cfg_if! {
 pub struct Arp;
 
 impl Arp {
-    /// Sends an ARP request to retrieve MAC address.
-    pub fn send_request(
-        src_ip: Ipv4Addr,
-        dest_ip: Ipv4Addr,
-    ) -> Result<(Option<MacAddr>, Option<Duration>)> {
-        // Get the interface that matches the source IP address.
-        let interface = match Interface::from_ip(src_ip) {
-            Some(interface) => interface,
-            None => return Err(CantFindInterface.into()),
-        };
-
-        // Get the MAC address of the source.
-        let src_mac = match interface.mac {
-            Some(mac) => mac,
-            None => return Err(CantFindMacAddress.into()),
-        };
-
-        // Create the ARP packet.
+    /// Constructs an ARP packet.
+    /// 
+    /// Sets:
+    /// - Source MAC address.
+    /// - Source IP address.
+    /// - Destination IP address.
+    pub fn build_arp_packet(src_mac: MacAddr, src_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> [u8; 28] {
         let mut arp_packet = [0u8; 28];
         let mut arp_header = MutableArpPacket::new(&mut arp_packet).unwrap();
 
-        // Set the ARP packet fields.
         arp_header.set_hardware_type(ArpHardwareTypes::Ethernet);
         arp_header.set_protocol_type(EtherTypes::Ipv4);
         arp_header.set_hw_addr_len(6);
@@ -74,27 +62,44 @@ impl Arp {
         arp_header.set_target_hw_addr(MacAddr::zero());
         arp_header.set_target_proto_addr(dest_ip);
 
-        // Set the ethertype for the Ethernet frame.
+        arp_packet
+    }
+
+    /// Sends an ARP request to retrieve MAC address.
+    /// 
+    /// The ARP packet is handed over to the data link layer.
+    pub fn send_request(
+        src_ip: Ipv4Addr,
+        dest_ip: Ipv4Addr,
+    ) -> Result<(Option<MacAddr>, Option<Duration>)> {
+        let interface = match Interface::from_ip(src_ip) {
+            Some(interface) => interface,
+            None => return Err(CantFindInterface.into()),
+        };
+
+        let src_mac = match interface.mac {
+            Some(mac) => mac,
+            None => return Err(CantFindMacAddress.into()),
+        };
+
+        let arp_packet = Arp::build_arp_packet(src_mac, src_ip, dest_ip);
+
         let ethernet_type = EtherTypes::Arp;
 
-        // Create the match data for layer 2.
         let data_link_layer = DatalinkLayer {
             src_mac: None,
             dest_mac: None,
             ethernet_type: Some(ethernet_type),
         };
 
-        // Create the match data for layer 3.
         let network_layer = NetworkLayer {
             datalink_layer: Some(data_link_layer),
             src_addr: Some(dest_ip.into()),
             dest_addr: Some(src_ip.into()),
         };
 
-        // Matches from layer 3 to layer 2.
         let layer = Layer::Three(network_layer);
 
-        // Send the ARP packet over the datalink layer.
         let (response, rtt) = DatalinkLayer::send_and_receive(
             interface,
             MacAddr::broadcast(),
@@ -104,7 +109,6 @@ impl Arp {
             0,
         )?;
 
-        // Extract the MAC address from the ARP response.
         match response {
             Some(packet) => Ok((Arp::get_mac_address(&packet), rtt)),
             None => Ok((None, None)),

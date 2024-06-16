@@ -41,34 +41,24 @@ mod tests {
         let interface = Interface::from_ip(local_ip);
 
         // Ensure the interface is found.
-        assert!(
-            interface.is_some(),
-            "Expected to find an interface with IP {}.",
-            local_ip
-        );
+        assert!(interface.is_some());
 
         // Ensure the interface contains the expected IP address.
-        assert_eq!(
-            interface
-                .unwrap()
-                .ips
-                .iter()
-                .any(|ip| ip.ip() == IpAddr::V4(local_ip)),
-            true,
-            "The found interface does not contain the expected IP address."
-        );
+        let contained = interface
+            .unwrap()
+            .ips
+            .iter()
+            .any(|ip| ip.ip() == IpAddr::V4(local_ip));
+        assert_eq!(contained, true);
     }
 
     #[test]
     fn test_from_ip_not_found() {
+        // IP address unlikely to be found on a local network.
         let unlikely_ip = Ipv4Addr::new(203, 0, 113, 1);
         let interface = Interface::from_ip(unlikely_ip);
 
         // Ensure the interface is not found.
-        assert!(
-            interface.is_none(),
-            "Expected not to find an interface with IP {}",
-            unlikely_ip
-        );
+        assert!(interface.is_none());
     }
 }

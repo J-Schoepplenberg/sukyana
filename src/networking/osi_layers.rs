@@ -1,13 +1,11 @@
 use super::interface::Interface;
 use crate::{
-    errors::{
-        CantFindInterface, CantFindMacAddress, CantFindRouterAddress, CreateDatalinkChannelFailed,
-    },
+    errors::{CantFindInterface, CantFindMacAddress, CantFindRouterAddress, ChannelError},
     networking::arp::Arp,
 };
 use anyhow::Result;
 use pnet::{
-    datalink::{self, DataLinkReceiver, DataLinkSender, NetworkInterface},
+    datalink::{self, Channel, NetworkInterface},
     packet::{
         arp::ArpPacket,
         ethernet::{EtherType, EtherTypes, EthernetPacket, MutableEthernetPacket},
@@ -100,15 +98,19 @@ impl MatchLayer for DatalinkLayer {
             Some(p) => p,
             None => return false,
         };
+
         let match_src = self
             .src_mac
             .map_or(true, |src_mac| src_mac == ethernet_packet.get_source());
+
         let match_dest = self.dest_mac.map_or(true, |dest_mac| {
             dest_mac == ethernet_packet.get_destination()
         });
+
         let match_type = self
             .ethernet_type
             .map_or(true, |eth_type| eth_type == ethernet_packet.get_ethertype());
+
         match_src && match_dest && match_type
     }
 }
@@ -132,8 +134,6 @@ impl MatchLayer for NetworkLayer {
         {
             return false;
         }
-        
-        println!("Matched at data link layer.");
 
         match ethernet_packet.get_ethertype() {
             EtherTypes::Ipv4 => {
@@ -141,14 +141,17 @@ impl MatchLayer for NetworkLayer {
                     Some(packet) => packet,
                     None => return false,
                 };
+
                 let match_src = self.src_addr.map_or(true, |src| match src {
                     IpAddr::V4(src_ip) => ipv4_packet.get_source() == src_ip,
                     _ => false,
                 });
+
                 let match_dest = self.dest_addr.map_or(true, |dest| match dest {
                     IpAddr::V4(dest_ip) => ipv4_packet.get_destination() == dest_ip,
                     _ => false,
                 });
+
                 match_src && match_dest
             }
             EtherTypes::Arp => {
@@ -156,14 +159,17 @@ impl MatchLayer for NetworkLayer {
                     Some(packet) => packet,
                     None => return false,
                 };
+
                 let match_src = self.src_addr.map_or(true, |src| match src {
                     IpAddr::V4(src_ip) => arp_packet.get_sender_proto_addr() == src_ip,
                     _ => false,
                 });
+
                 let match_dest = self.dest_addr.map_or(true, |dest| match dest {
                     IpAddr::V4(dest_ip) => arp_packet.get_target_proto_addr() == dest_ip,
                     _ => false,
                 });
+
                 match_src && match_dest
             }
             _ => false, // IPv6, etc.
@@ -180,69 +186,79 @@ impl MatchLayer for TransportLayer {
     ///
     /// Only matches TCP packets.
     fn match_packet(&self, packet: &[u8]) -> bool {
-        // Create an Ethernet packet from the payload.
         let ethernet_packet = match EthernetPacket::new(packet) {
             Some(p) => p,
             None => return false,
         };
 
-        // Check if layer 3 (network) matches.
-        let match_1 = match self.network_layer {
-            Some(layer) => layer.match_packet(packet),
-            None => true,
-        };
+        if !self
+            .network_layer
+            .as_ref()
+            .map_or(true, |layer| layer.match_packet(packet))
+        {
+            return false;
+        }
 
-        let (response_src_port, response_dest_port) = match ethernet_packet.get_ethertype() {
+        let ports = match ethernet_packet.get_ethertype() {
             EtherTypes::Ipv4 => {
-                // Create an IPv4 packet from the payload.
                 let ipv4_packet = match Ipv4Packet::new(ethernet_packet.payload()) {
                     Some(packet) => packet,
                     None => return false,
                 };
 
-                // Extract the source and destination ports from the TCP packet.
-                match ipv4_packet.get_next_level_protocol() {
-                    IpNextHeaderProtocols::Tcp => {
-                        let tcp_packet = match TcpPacket::new(ipv4_packet.payload()) {
-                            Some(packet) => packet,
-                            None => return false,
-                        };
-                        (tcp_packet.get_source(), tcp_packet.get_destination())
-                    }
-                    _ => (0, 0),
+                if ipv4_packet.get_next_level_protocol() == IpNextHeaderProtocols::Tcp {
+                    TcpPacket::new(ipv4_packet.payload())
+                        .map(|tcp| (tcp.get_source(), tcp.get_destination()))
+                } else {
+                    None
                 }
             }
-            _ => (0, 0), // IPv6 etc.
+            _ => None,
         };
 
-        // Check if the source port matches.
-        let match_2 = match self.src_port {
-            Some(src_port) => src_port == response_src_port,
-            None => true,
+        let (src_port, dest_port) = match ports {
+            Some(ports) => ports,
+            None => return false,
         };
 
-        // Check if the destination port matches.
-        let match_3 = match self.dest_port {
-            Some(dest_port) => dest_port == response_dest_port,
-            None => true,
-        };
+        let match_src_port = self.src_port.map_or(true, |port| port == src_port);
 
-        match_1 && match_2 && match_3
+        let match_dest_port = self.dest_port.map_or(true, |port| port == dest_port);
+
+        match_src_port && match_dest_port
     }
 }
 
 impl DatalinkLayer {
-    /// Creates a data link layer channel for sending and receiving packets.
-    pub fn create_channel(
-        interface: &NetworkInterface,
-    ) -> Result<Option<(Box<dyn DataLinkSender>, Box<dyn DataLinkReceiver>)>> {
-        match datalink::channel(interface, Default::default()) {
-            Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => Ok(Some((tx, rx))),
-            Ok(_) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
+    /// Creates an Ethernet packet.
+    ///
+    /// Sets:
+    /// - Source MAC address.
+    /// - Destination MAC address.
+    /// - Ethertype.
+    /// - Payload.
+    pub fn build_ethernet_packet(
+        src_mac: MacAddr,
+        dest_mac: MacAddr,
+        ethertype: EtherType,
+        payload: &[u8],
+    ) -> Vec<u8> {
+        let mut ethernet_buffer = [0u8; ETHERNET_BUFFER_SIZE];
+        let mut ethernet_packet = MutableEthernetPacket::new(&mut ethernet_buffer).unwrap();
+
+        ethernet_packet.set_source(src_mac);
+        ethernet_packet.set_destination(dest_mac);
+        ethernet_packet.set_ethertype(ethertype);
+        ethernet_packet.set_payload(payload);
+
+        ethernet_buffer[..(ETHERNET_HEADER_SIZE + payload.len())].to_vec()
     }
 
+    /// Sends a packet over a data link channel and waits 3 seconds for a response.
+    ///
+    /// Processes the ethernet frames in the channel and matches them against the provided layer data.
+    ///
+    /// Returns a matching response and the round-trip time.
     pub fn send_and_receive(
         interface: NetworkInterface,
         dest_mac: MacAddr,
@@ -251,81 +267,53 @@ impl DatalinkLayer {
         layers: Layer,
         val: u8,
     ) -> Result<(Option<Vec<u8>>, Option<Duration>)> {
-        // Create datalink channel.
-        let (mut sender, mut receiver) = match DatalinkLayer::create_channel(&interface)? {
-            Some((s, r)) => (s, r),
-            None => return Err(CreateDatalinkChannelFailed.into()),
+        let channel = datalink::channel(&interface, Default::default())?;
+
+        let (mut sender, mut receiver) = match channel {
+            Channel::Ethernet(tx, rx) => (tx, rx),
+            _ => return Err(ChannelError::UnexpectedChannelType.into()),
         };
 
-        // Determine the source MAC address.
         let src_mac = if dest_mac == MacAddr::zero() {
             MacAddr::zero()
         } else {
-            match interface.mac {
-                Some(mac) => mac,
-                None => return Err(CantFindMacAddress.into()),
-            }
+            interface.mac.ok_or(CantFindMacAddress)?
         };
 
-        // Create Ethernet packet.
-        let mut ethernet_buffer = [0u8; ETHERNET_BUFFER_SIZE];
-        let mut ethernet_packet = MutableEthernetPacket::new(&mut ethernet_buffer).unwrap();
-        ethernet_packet.set_destination(dest_mac);
-        ethernet_packet.set_source(src_mac);
-        ethernet_packet.set_ethertype(ethernet_type);
-        ethernet_packet.set_payload(packet);
+        let ethernet_packet =
+            DatalinkLayer::build_ethernet_packet(src_mac, dest_mac, ethernet_type, packet);
 
-        // Start the timer.
         let send_time = Instant::now();
 
-        // Construct the final payload.
-        let final_packet =
-            ethernet_buffer[..(ETHERNET_HEADER_SIZE + packet.len())].to_vec();
+        sender
+            .send_to(&ethernet_packet, Some(interface))
+            .ok_or(ChannelError::SendError)??;
 
-        // Send the packet.
-        match sender.send_to(&final_packet, Some(interface)) {
-            Some(r) => match r {
-                Err(e) => return Err(e.into()),
-                _ => (),
-            },
-            None => (),
-        }
+        let timeout = Duration::from_secs(3);
+        let mut response_buffer = None;
 
-        println!("Sent {val}.");
-
-        // Receive the response. Timeout after 5 seconds.
-        let mut response_buffer: Vec<u8>;
-        loop {
-            match receiver.next() {
-                Ok(response_packet) => {
-                    response_buffer = response_packet.to_vec();
-                    match layers.match_layer(&response_buffer) {
-                        true => {
-                            println!("Matched.");
-                            break;
-                        }
-                        false => (),
-                    }
-                    if send_time.elapsed() > Duration::from_secs(5) {
-                        println!("Timeout.");
-                        break;
-                    }
-                }
-                Err(e) => {
-                    panic!("An error occurred while reading: {}", e);
+        while send_time.elapsed() < timeout {
+            if let Ok(response) = receiver.next() {
+                if layers.match_layer(response) {
+                    println!("Received {val}.");
+                    response_buffer = Some(response.to_vec());
+                    break;
                 }
             }
         }
 
-        // Calculate the round-trip time.
         let rtt = send_time.elapsed();
 
-        // Return the response and the round-trip time.
-        Ok((Some(response_buffer), Some(rtt)))
+        Ok((response_buffer, Some(rtt)))
     }
 }
 
 impl NetworkLayer {
+    /// Determines the MAC address of `dest_ip` and which interface to use.
+    ///
+    /// The packet is handed over to the data link layer.
+    ///
+    /// Returns the response and the round-trip time.
     pub fn send_and_receive(
         src_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
@@ -333,79 +321,14 @@ impl NetworkLayer {
         layers: Layer,
         val: u8,
     ) -> Result<(Option<Vec<u8>>, Option<Duration>)> {
-        let mut dest_loopback = false;
-        // Determine the destination MAC address.
-        let dest_mac = if NetworkLayer::is_dest_ip_local(dest_ip) {
-            println!("Local network.");
-            // Local network.
-            // Check if the packet is destined for the local network.
-            if dest_ip == src_ip || dest_ip.is_loopback() {
-                dest_loopback = true;
-                MacAddr::zero()
-            } else {
-                // Check the ARP cache to see if the MAC address is already known.
-                match Arp::search_neighbor_cache(dest_ip.into())? {
-                    Some(mac) => mac, // Found in the ARP cache.
-                    None => {
-                        // Send an ARP request.
-                        println!("ARP request needed.");
-                        let mut mac_addr: Option<MacAddr> = None;
+        let dest_mac = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip)?;
 
-                        // Attempt to retrieve the MAC address via ARP.
-                        for _ in 0..NEIGHBOUR_CACHE_MAX_TRY {
-                            match Arp::send_request(src_ip, dest_ip)? {
-                                (Some(mac), _) => {
-                                    mac_addr = Some(mac);
-                                    break;
-                                }
-                                (None, _) => (),
-                            }
-                        }
-
-                        // Return the MAC address.
-                        match mac_addr {
-                            Some(mac) => mac,
-                            None => return Err(CantFindMacAddress.into()),
-                        }
-                    }
-                }
-            }
-        } else {
-            println!("Remote network.");
-            // Remote network.
-            // Retrieve the IP address of the default gateway.
-            let router_ip = NetworkLayer::system_route()?;
-            // Retrieve the mac address of the default gateway.
-            match Arp::search_neighbor_cache(router_ip.into())? {
-                Some(mac) => mac, // Found in the ARP cache.
-                None => {
-                    // Send an ARP request.
-                    let mut mac: Option<MacAddr> = None;
-                    for _ in 0..NEIGHBOUR_CACHE_MAX_TRY {
-                        match Arp::send_request(src_ip, router_ip)? {
-                            (Some(mac_addr), _) => {
-                                mac = Some(mac_addr);
-                                break;
-                            }
-                            (None, _) => (),
-                        }
-                    }
-
-                    match mac {
-                        Some(mac) => mac,
-                        None => return Err(CantFindMacAddress.into()),
-                    }
-                }
-            }
-        };
-
-        let interface = if dest_loopback {
+        let interface = if NetworkLayer::is_dest_ip_loopback(src_ip, dest_ip) {
             Interface::from_loopback().ok_or(CantFindInterface)?
         } else {
             Interface::from_ip(src_ip).ok_or(CantFindInterface)?
         };
 
-        // Send the packet over the datalink layer.
         let (response, rtt) = DatalinkLayer::send_and_receive(
             interface,
             dest_mac,
@@ -415,15 +338,52 @@ impl NetworkLayer {
             val,
         )?;
 
-        // Pass up the response to the caller.
-        match response {
-            Some(layer_2_packet) => Ok((Some(layer_2_packet), rtt)),
-            None => Ok((None, None)),
+        Ok((response, rtt))
+    }
+
+    /// Attempts to determine the MAC address of the given `dest_ip`.
+    ///
+    /// If `dest_ip` is local, the MAC address is set to zero or resolved using the system's ARP cache.
+    ///
+    /// Otherwise, returns the resolved MAC address of the default gateway.
+    pub fn get_dest_mac_addres(src_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> Result<MacAddr> {
+        if NetworkLayer::is_dest_ip_local(dest_ip) {
+            if NetworkLayer::is_dest_ip_loopback(src_ip, dest_ip) {
+                Ok(MacAddr::zero())
+            } else {
+                NetworkLayer::resolve_mac_address(src_ip, dest_ip)
+            }
+        } else {
+            let router_ip = NetworkLayer::system_route()?;
+            NetworkLayer::resolve_mac_address(src_ip, router_ip)
         }
+    }
+
+    /// Attempts to resolve the MAC address of the given `dest_ip`.
+    ///
+    /// First searches the system's ARP cache, then sends an ARP request if the MAC address is not found.
+    pub fn resolve_mac_address(src_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> Result<MacAddr> {
+        Arp::search_neighbor_cache(dest_ip.into())?
+            .or_else(|| {
+                (0..NEIGHBOUR_CACHE_MAX_TRY).find_map(|_| {
+                    Arp::send_request(src_ip, dest_ip)
+                        .ok()
+                        .and_then(|(mac, _)| mac)
+                })
+            })
+            .ok_or(CantFindMacAddress.into())
+    }
+
+    /// Check if `dest_ip` and `src_ip` are the same or if `dest_ip` is a loopback address.
+    pub fn is_dest_ip_loopback(src_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> bool {
+        dest_ip == src_ip || dest_ip.is_loopback()
     }
 
     /// Determines if the destination IP address is local to the network.
     pub fn is_dest_ip_local(dest_ip: Ipv4Addr) -> bool {
+        if dest_ip.is_loopback() {
+            return true;
+        }
         datalink::interfaces().iter().any(|interface| {
             interface
                 .ips
@@ -456,9 +416,8 @@ impl NetworkLayer {
 
 #[cfg(test)]
 mod tests {
-    use pnet::packet::{ipv4::MutableIpv4Packet, FromPacket};
-
     use super::*;
+    use crate::networking::tcp::Tcp;
     use std::{os::windows::process::ExitStatusExt, process::Output};
 
     fn mock_system_route(output: Output, route: &str) -> Result<Ipv4Addr> {
@@ -477,91 +436,65 @@ mod tests {
     }
 
     #[test]
-    fn test_data_link_layer_match() {
-        // Set up the data link layer.
+    fn test_layers_match() {
+        // Set up the data we need for the layers.
         let src_mac = MacAddr::new(0, 1, 2, 3, 4, 5);
         let dest_mac = MacAddr::new(6, 7, 8, 9, 10, 11);
         let ethertype = EtherTypes::Ipv4;
-        let layer = DatalinkLayer {
-            src_mac: Some(src_mac),
-            dest_mac: Some(dest_mac),
-            ethernet_type: Some(ethertype),
-        };
+        let src_ip = Ipv4Addr::new(192, 168, 0, 1);
+        let dest_ip = Ipv4Addr::new(192, 168, 0, 2);
+        let src_port = 12345;
+        let dest_port = 80;
 
-        // Create an Ethernet packet from the packet_buffer.
-        let mut packet_buffer = [0u8; 42];
-        let mut eth_packet = MutableEthernetPacket::new(&mut packet_buffer).unwrap();
-
-        // Set the packet fields.
-        eth_packet.set_source(src_mac);
-        eth_packet.set_destination(dest_mac);
-        eth_packet.set_ethertype(ethertype);
-
-        // Ensure the packet matches the layer.
-        assert!(layer.match_packet(&eth_packet.packet()));
-
-        // Change the source MAC address.
-        eth_packet.set_source(MacAddr::new(1, 2, 3, 4, 5, 6));
-
-        // Ensure the packet does not match the layer anymore.
-        assert!(!layer.match_packet(&eth_packet.packet()));
-    }
-
-    #[test]
-    fn test_network_layer_match() {
-        // Set up the data link layer.
-        let src_mac = MacAddr::new(0, 1, 2, 3, 4, 5);
-        let dest_mac = MacAddr::new(6, 7, 8, 9, 10, 11);
-        let ethertype = EtherTypes::Ipv4;
+        // Create the data link layer.
         let datalink_layer = DatalinkLayer {
             src_mac: Some(src_mac),
             dest_mac: Some(dest_mac),
             ethernet_type: Some(ethertype),
         };
 
-        // Set up the network layer.
-        let src_ip = Ipv4Addr::new(192, 168, 0, 1);
-        let dest_ip = Ipv4Addr::new(192, 168, 0, 2);
+        // Create the network layer.
         let network_layer = NetworkLayer {
             datalink_layer: Some(datalink_layer),
             src_addr: Some(IpAddr::V4(src_ip)),
             dest_addr: Some(IpAddr::V4(dest_ip)),
         };
 
-        // Create IPv4 header.
-        let mut ipv4_packet = [0u8; 20];
-        let mut ipv4_header = MutableIpv4Packet::new(&mut ipv4_packet).unwrap();
-        ipv4_header.set_source(src_ip);
-        ipv4_header.set_destination(dest_ip);
-        ipv4_header.set_destination(dest_ip);
+        // Create the transport layer.
+        let transport_layer = TransportLayer {
+            network_layer: Some(network_layer),
+            src_port: Some(src_port),
+            dest_port: Some(dest_port),
+        };
 
-        // Create Ethernet packet.
-        let mut ethernet_buffer = [0u8; ETHERNET_BUFFER_SIZE];
-        let mut ethernet_packet = MutableEthernetPacket::new(&mut ethernet_buffer).unwrap();
-        ethernet_packet.set_destination(dest_mac);
-        ethernet_packet.set_source(src_mac);
-        ethernet_packet.set_ethertype(ethertype);
-        ethernet_packet.set_payload(&ipv4_packet);
+        // The packet should match all layers.
+        let tcp_packet_1 = Tcp::build_syn_packet(src_ip, src_port, dest_ip, dest_port);
+        let ethernet_packet_1 =
+            DatalinkLayer::build_ethernet_packet(src_mac, dest_mac, ethertype, &tcp_packet_1);
+        assert!(transport_layer.match_packet(&ethernet_packet_1));
 
-        // Create the final packet.
-        let final_packet = ethernet_buffer[..(ETHERNET_HEADER_SIZE + ipv4_packet.len())].to_vec();
+        // The packet should not match anymore since src_ip and dest_port are different.
+        let tcp_packet_2 =
+            Tcp::build_syn_packet(Ipv4Addr::new(10, 0, 0, 1), src_port, dest_ip, 443);
+        let ethernet_packet_2 =
+            DatalinkLayer::build_ethernet_packet(src_mac, dest_mac, ethertype, &tcp_packet_2);
+        assert!(!transport_layer.match_packet(&ethernet_packet_2));
+    }
 
-        // Ensure the packet matches both layers.
-        assert!(network_layer.match_packet(&final_packet));
+    #[test]
+    fn test_get_dest_mac_address() {
+        // Test with a local IP address.
+        let src_ip = Ipv4Addr::new(127, 0, 0, 1);
+        let dest_ip = Ipv4Addr::new(127, 0, 0, 1);
+        let mac = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip);
+        assert!(mac.is_ok());
+        assert_eq!(mac.unwrap(), MacAddr::zero());
 
-        /* let mut packet_data_invalid = [0u8; 42];
-        {
-            let mut eth_packet = MutableEthernetPacket::new(&mut packet_data_invalid).unwrap();
-            eth_packet.set_source(src_mac); 
-            eth_packet.set_destination(dest_mac);
-            eth_packet.set_ethertype(ethertype);
-
-            let mut ipv4_packet = MutableIpv4Packet::new(&mut eth_packet.packet()).unwrap();
-            ipv4_packet.set_source(Ipv4Addr::new(10, 0, 0, 1));
-            ipv4_packet.set_destination(dest_ip);
-        }
-
-        assert!(!network_layer.match_packet(&packet_data_invalid)); */
+        // Test with a non-local IP address.
+        let dest_ip_remote = Ipv4Addr::new(8, 8, 8, 8);
+        let mac_remote = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip_remote);
+        assert!(mac_remote.is_ok());
+        assert_ne!(mac_remote.unwrap(), MacAddr::zero());
     }
 
     #[test]

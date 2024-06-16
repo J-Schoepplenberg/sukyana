@@ -50,3 +50,21 @@ impl Display for CantFindRouterAddress {
         write!(f, "Cannot find a router address.")
     }
 }
+
+/// Error type for when a data link channel encounters an error.
+#[derive(Debug)]
+pub enum ChannelError {
+    UnexpectedChannelType,
+    SendError,
+}
+
+impl Error for ChannelError {}
+
+impl Display for ChannelError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            ChannelError::UnexpectedChannelType => write!(f, "Unexpected channel type"),
+            ChannelError::SendError => write!(f, "Send error"),
+        }
+    }
+}

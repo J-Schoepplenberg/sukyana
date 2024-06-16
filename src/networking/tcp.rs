@@ -18,6 +18,15 @@ const TTL: u8 = 64;
 pub struct Tcp;
 
 impl Tcp {
+    /// Constructs IPv4 and TCP headers for a TCP SYN packet.
+    ///
+    /// Sets:
+    /// - Source IP address.
+    /// - Source port.
+    /// - Destination IP address.
+    /// - Destination port.
+    ///
+    /// Returns a byte array containing the IPv4 and TCP headers.
     pub fn build_syn_packet(
         src_ip: Ipv4Addr,
         src_port: u16,
@@ -57,6 +66,9 @@ impl Tcp {
         tcp_packet
     }
 
+    /// Sends a TCP SYN packet and parses the response.
+    ///
+    /// The packet is handed over to the network layer.
     pub fn send_syn_packet(
         value: u8,
         src_ip: Ipv4Addr,
@@ -122,8 +134,10 @@ mod tests {
         // Build a SYN packet.
         let packet = Tcp::build_syn_packet(src_ip, src_port, dest_ip, dest_port);
 
-        // Verify the IP header.
+        // Create the IP packet.
         let ip_packet = Ipv4Packet::new(&packet).unwrap();
+
+        // Verify the IP packet.
         assert_eq!(ip_packet.get_version(), 4);
         assert_eq!(ip_packet.get_source(), src_ip);
         assert_eq!(ip_packet.get_destination(), dest_ip);
@@ -132,8 +146,10 @@ mod tests {
             IpNextHeaderProtocols::Tcp
         );
 
-        // Verify the TCP header.
+        // Create the TCP packet.
         let tcp_packet = TcpPacket::new(&packet[IPV4_HEADER_SIZE..]).unwrap();
+
+        // Verify the TCP packlet.
         assert_eq!(tcp_packet.get_source(), src_port);
         assert_eq!(tcp_packet.get_destination(), dest_port);
         assert_eq!(tcp_packet.get_flags(), TcpFlags::SYN);
@@ -149,7 +165,7 @@ mod tests {
         let dest_ip = Ipv4Addr::new(142, 251, 209, 131);
         let dest_port = 80;
 
-        // Send a SYN packet.
+        // Send a SYN packet. Calls subsequently the network and data link layer.
         let (packet, rtt) = Tcp::send_syn_packet(1, src_ip, src_port, dest_ip, dest_port)?;
 
         // Ensure we have received a response packet.
