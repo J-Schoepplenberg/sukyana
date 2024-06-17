@@ -39,7 +39,7 @@ cfg_if::cfg_if! {
 
 const ETHERNET_BUFFER_SIZE: usize = 4096;
 const ETHERNET_HEADER_SIZE: usize = 14;
-const NEIGHBOUR_CACHE_MAX_TRY: usize = 3;
+const NEIGHBOR_CACHE_MAX_TRY: usize = 3;
 
 /// Represents the different layers of the OSI model.
 pub enum Layer {
@@ -90,9 +90,7 @@ pub trait MatchLayer {
 }
 
 impl MatchLayer for DatalinkLayer {
-    /// Matches the packet at the datalink layer.
-    ///
-    /// Checks for the source and destination MAC addresses and the Ethernet type.
+    /// Matches the packet at the data link layer.
     fn match_packet(&self, packet: &[u8]) -> bool {
         let ethernet_packet = match EthernetPacket::new(packet) {
             Some(p) => p,
@@ -118,9 +116,7 @@ impl MatchLayer for DatalinkLayer {
 impl MatchLayer for NetworkLayer {
     /// Matches the packet at the network layer.
     ///
-    /// First matches at the data link layer, then checks the source and destination IP addresses.
-    ///
-    /// Only matches IPv4 packets.
+    /// Must also match at the data link layer.
     fn match_packet(&self, packet: &[u8]) -> bool {
         let ethernet_packet = match EthernetPacket::new(packet) {
             Some(p) => p,
@@ -180,11 +176,7 @@ impl MatchLayer for NetworkLayer {
 impl MatchLayer for TransportLayer {
     /// Matches the packet at the transport layer.
     ///
-    /// First matches at the network layer, which also matches on the data link layer.
-    ///
-    /// Then checks the source and destination ports.
-    ///
-    /// Only matches TCP packets.
+    /// Must also match at the network layer and data link layer.
     fn match_packet(&self, packet: &[u8]) -> bool {
         let ethernet_packet = match EthernetPacket::new(packet) {
             Some(p) => p,
@@ -231,12 +223,6 @@ impl MatchLayer for TransportLayer {
 
 impl DatalinkLayer {
     /// Creates an Ethernet packet.
-    ///
-    /// Sets:
-    /// - Source MAC address.
-    /// - Destination MAC address.
-    /// - Ethertype.
-    /// - Payload.
     pub fn build_ethernet_packet(
         src_mac: MacAddr,
         dest_mac: MacAddr,
@@ -265,7 +251,7 @@ impl DatalinkLayer {
         ethernet_type: EtherType,
         packet: &[u8],
         layers: Layer,
-        val: u8,
+        val: u16,
     ) -> Result<(Option<Vec<u8>>, Option<Duration>)> {
         let channel = datalink::channel(&interface, Default::default())?;
 
@@ -289,13 +275,11 @@ impl DatalinkLayer {
             .send_to(&ethernet_packet, Some(interface))
             .ok_or(ChannelError::SendError)??;
 
-        let timeout = Duration::from_secs(3);
+        let timeout = Duration::from_secs(5);
         let mut response_buffer = None;
-
         while send_time.elapsed() < timeout {
             if let Ok(response) = receiver.next() {
                 if layers.match_layer(response) {
-                    println!("Received {val}.");
                     response_buffer = Some(response.to_vec());
                     break;
                 }
@@ -319,7 +303,7 @@ impl NetworkLayer {
         dest_ip: Ipv4Addr,
         packet: &[u8],
         layers: Layer,
-        val: u8,
+        val: u16,
     ) -> Result<(Option<Vec<u8>>, Option<Duration>)> {
         let dest_mac = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip)?;
 
@@ -354,7 +338,7 @@ impl NetworkLayer {
                 NetworkLayer::resolve_mac_address(src_ip, dest_ip)
             }
         } else {
-            let router_ip = NetworkLayer::system_route()?;
+            let router_ip = NetworkLayer::get_default_route_ip()?;
             NetworkLayer::resolve_mac_address(src_ip, router_ip)
         }
     }
@@ -365,7 +349,7 @@ impl NetworkLayer {
     pub fn resolve_mac_address(src_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> Result<MacAddr> {
         Arp::search_neighbor_cache(dest_ip.into())?
             .or_else(|| {
-                (0..NEIGHBOUR_CACHE_MAX_TRY).find_map(|_| {
+                (0..NEIGHBOR_CACHE_MAX_TRY).find_map(|_| {
                     Arp::send_request(src_ip, dest_ip)
                         .ok()
                         .and_then(|(mac, _)| mac)
@@ -397,7 +381,7 @@ impl NetworkLayer {
     /// Issues a `Command` to get the system's routing table.
     ///
     /// The output from the launched program is parsed to find the default route.
-    pub fn system_route() -> Result<Ipv4Addr> {
+    pub fn get_default_route_ip() -> Result<Ipv4Addr> {
         let output = Command::new(ROUTE_COMMAND).args(&ROUTE_ARGS).output()?;
         let stdout = String::from_utf8_lossy(&output.stdout);
         let lines = stdout.lines();

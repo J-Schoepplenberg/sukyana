@@ -1,10 +1,9 @@
 use super::osi_layers::{Layer, NetworkLayer, TransportLayer};
 use anyhow::Result;
-use log::debug;
 use pnet::packet::{
     self,
     ip::IpNextHeaderProtocols,
-    ipv4::{self, Ipv4Flags, Ipv4Packet, MutableIpv4Packet},
+    ipv4::{self, Ipv4Flags, MutableIpv4Packet},
     tcp::{MutableTcpPacket, TcpFlags},
 };
 use rand::Rng;
@@ -70,51 +69,32 @@ impl Tcp {
     ///
     /// The packet is handed over to the network layer.
     pub fn send_syn_packet(
-        value: u8,
+        value: u16,
         src_ip: Ipv4Addr,
         src_port: u16,
         dest_ip: Ipv4Addr,
         dest_port: u16,
     ) -> Result<(Option<Vec<u8>>, Option<Duration>)> {
-        // Build the TCP SYN packet.
         let packet = Tcp::build_syn_packet(src_ip, src_port, dest_ip, dest_port);
 
-        // Create the match data for layer 3.
         let network_layer = NetworkLayer {
             datalink_layer: None,
             src_addr: Some(dest_ip.into()),
             dest_addr: Some(src_ip.into()),
         };
 
-        // Create the match data for layer 4.
         let transport_layer = TransportLayer {
             network_layer: Some(network_layer),
             src_port: Some(dest_port),
             dest_port: Some(src_port),
         };
 
-        // Matches from layer 4 to layer 2.
         let layer = Layer::Four(transport_layer);
 
-        // Send the packet over the network layer.
-        // The packet is handed over to the network layer.
         let (response, rtt) =
             NetworkLayer::send_and_receive(src_ip, dest_ip, &packet, layer, value)?;
 
-        // Parse the IPv4 response.
-        match response {
-            Some(packet) => {
-                match Ipv4Packet::new(&packet) {
-                    Some(ip_packet) => {
-                        debug!("TCP response: {:?}", ip_packet);
-                        // TODO: Parse the TCP response.
-                    }
-                    None => debug!("No TCP response."),
-                }
-                Ok((Some(packet), rtt))
-            }
-            None => Ok((None, None)),
-        }
+        Ok((response, rtt))
     }
 }
 
@@ -122,6 +102,7 @@ impl Tcp {
 mod tests {
     use super::*;
     use anyhow::Result;
+    use ipv4::Ipv4Packet;
     use pnet::packet::tcp::TcpPacket;
 
     #[test]

@@ -173,7 +173,7 @@ mod tests {
         let src_ip = Ipv4Addr::new(192, 168, 178, 26);
 
         // Router IP address.
-        let router_ip = NetworkLayer::system_route()?;
+        let router_ip = NetworkLayer::get_default_route_ip()?;
 
         // Send an ARP request to the router. Parses the MAC address from the response.
         let (response, rtt) = Arp::send_request(src_ip, router_ip).unwrap();
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_search_neighbor_cache() -> Result<()> {
         // Router IP address.
-        let router_ip = IpAddr::V4(NetworkLayer::system_route()?);
+        let router_ip = IpAddr::V4(NetworkLayer::get_default_route_ip()?);
 
         // Search the neighbor cache for the router.
         let result = Arp::search_neighbor_cache(router_ip).unwrap();
