@@ -1,8 +1,9 @@
+use crate::errors::ScannerError;
+
 use super::{
     interface::Interface,
     osi_layers::{DatalinkLayer, Layer, NetworkLayer},
 };
-use crate::errors::{CantFindInterface, CantFindMacAddress};
 use anyhow::Result;
 use pnet::{
     packet::{
@@ -74,12 +75,12 @@ impl Arp {
     ) -> Result<(Option<MacAddr>, Option<Duration>)> {
         let interface = match Interface::from_ip(src_ip) {
             Some(interface) => interface,
-            None => return Err(CantFindInterface.into()),
+            None => return Err(ScannerError::CantFindInterface.into()),
         };
 
         let src_mac = match interface.mac {
             Some(mac) => mac,
-            None => return Err(CantFindMacAddress.into()),
+            None => return Err(ScannerError::CantFindMacAddress.into()),
         };
 
         let arp_packet = Arp::build_arp_packet(src_mac, src_ip, dest_ip);

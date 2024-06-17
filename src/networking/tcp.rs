@@ -18,14 +18,6 @@ pub struct Tcp;
 
 impl Tcp {
     /// Constructs IPv4 and TCP headers for a TCP SYN packet.
-    ///
-    /// Sets:
-    /// - Source IP address.
-    /// - Source port.
-    /// - Destination IP address.
-    /// - Destination port.
-    ///
-    /// Returns a byte array containing the IPv4 and TCP headers.
     pub fn build_syn_packet(
         src_ip: Ipv4Addr,
         src_port: u16,

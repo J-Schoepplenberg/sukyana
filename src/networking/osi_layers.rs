@@ -1,6 +1,6 @@
 use super::interface::Interface;
 use crate::{
-    errors::{CantFindInterface, CantFindMacAddress, CantFindRouterAddress, ChannelError},
+    errors::{ChannelError, ScannerError},
     networking::arp::Arp,
 };
 use anyhow::Result;
@@ -263,7 +263,7 @@ impl DatalinkLayer {
         let src_mac = if dest_mac == MacAddr::zero() {
             MacAddr::zero()
         } else {
-            interface.mac.ok_or(CantFindMacAddress)?
+            interface.mac.ok_or(ScannerError::CantFindMacAddress)?
         };
 
         let ethernet_packet =
@@ -308,9 +308,9 @@ impl NetworkLayer {
         let dest_mac = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip)?;
 
         let interface = if NetworkLayer::is_dest_ip_loopback(src_ip, dest_ip) {
-            Interface::from_loopback().ok_or(CantFindInterface)?
+            Interface::from_loopback().ok_or(ScannerError::CantFindInterface)?
         } else {
-            Interface::from_ip(src_ip).ok_or(CantFindInterface)?
+            Interface::from_ip(src_ip).ok_or(ScannerError::CantFindInterface)?
         };
 
         let (response, rtt) = DatalinkLayer::send_and_receive(
@@ -355,7 +355,7 @@ impl NetworkLayer {
                         .and_then(|(mac, _)| mac)
                 })
             })
-            .ok_or(CantFindMacAddress.into())
+            .ok_or(ScannerError::CantFindMacAddress.into())
     }
 
     /// Check if `dest_ip` and `src_ip` are the same or if `dest_ip` is a loopback address.
@@ -394,7 +394,7 @@ impl NetworkLayer {
                 }
             }
         }
-        Err(CantFindRouterAddress.into())
+        Err(ScannerError::CantFindRouterAddress.into())
     }
 }
 
@@ -416,7 +416,7 @@ mod tests {
                 }
             }
         }
-        Err(CantFindRouterAddress.into())
+        Err(ScannerError::CantFindRouterAddress.into())
     }
 
     #[test]

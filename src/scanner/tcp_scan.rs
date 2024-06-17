@@ -1,5 +1,5 @@
 use super::scanner::ScanResult;
-use crate::{errors::CantFindRouterAddress, networking::tcp::Tcp};
+use crate::{errors::ScannerError, networking::tcp::Tcp};
 use anyhow::Result;
 use pnet::packet::{
     ethernet::{EtherTypes, EthernetPacket},
@@ -23,10 +23,12 @@ pub fn tcp_syn_scan(
         IpAddr::V4(ip) => ip,
         _ => panic!("Only IPv4 is supported"),
     };
+
     let ipv4_dest = match dest_ip {
         IpAddr::V4(ip) => ip,
         _ => panic!("Only IPv4 is supported"),
     };
+
     let (response, rtt) = Tcp::send_syn_packet(value, ipv4_src, src_port, ipv4_dest, dest_port)?;
 
     let packet = match response {
@@ -34,17 +36,20 @@ pub fn tcp_syn_scan(
         None => return Ok(ScanResult::Filtered),
     };
 
-    let ethernet_packet = EthernetPacket::new(&packet).ok_or(CantFindRouterAddress)?;
+    let ethernet_packet =
+        EthernetPacket::new(&packet).ok_or(ScannerError::CantCreateEthernetPacket)?;
 
     if ethernet_packet.get_ethertype() != EtherTypes::Ipv4 {
         return Ok(ScanResult::Filtered);
     }
 
-    let ipv4_packet = Ipv4Packet::new(ethernet_packet.payload()).ok_or(CantFindRouterAddress)?;
+    let ipv4_packet =
+        Ipv4Packet::new(ethernet_packet.payload()).ok_or(ScannerError::CantCreateIpv4Packet)?;
 
     match ipv4_packet.get_next_level_protocol() {
         IpNextHeaderProtocols::Tcp => {
-            let tcp_packet = TcpPacket::new(ipv4_packet.payload()).ok_or(CantFindRouterAddress)?;
+            let tcp_packet =
+                TcpPacket::new(ipv4_packet.payload()).ok_or(ScannerError::CantCreateTcpPacket)?;
             let tcp_flags = tcp_packet.get_flags();
             if tcp_flags == (TcpFlags::SYN | TcpFlags::ACK) {
                 return Ok(ScanResult::Open);
