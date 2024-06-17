@@ -66,7 +66,7 @@ impl Tcp {
         src_port: u16,
         dest_ip: Ipv4Addr,
         dest_port: u16,
-    ) -> Result<(Option<Vec<u8>>, Option<Duration>)> {
+    ) -> Result<(Option<Vec<u8>>, Duration)> {
         let packet = Tcp::build_syn_packet(src_ip, src_port, dest_ip, dest_port);
 
         let network_layer = NetworkLayer {
@@ -143,9 +143,6 @@ mod tests {
 
         // Ensure we have received a response packet.
         assert!(packet.is_some());
-
-        // Ensure we have received a round-trip time.
-        assert!(rtt.is_some());
 
         Ok(())
     }

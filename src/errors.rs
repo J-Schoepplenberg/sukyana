@@ -14,6 +14,10 @@ pub enum ScannerError {
     CantCreateIpv4Packet,
     #[error("Cannot create a TCP packet.")]
     CantCreateTcpPacket,
+    #[error("Cannot create an ICMP packet.")]
+    CantCreateIcmpPacket,
+    #[error("This IP protocol version is not supported.")]
+    UnsupportedIpVersion,
 }
 
 #[derive(Error, Debug)]

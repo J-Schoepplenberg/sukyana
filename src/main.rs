@@ -20,7 +20,7 @@ async fn main() {
     let port_numbers = vec![22, 80, 443, 8080, 8081];
 
     let scanner = Scanner::new(
-        ScanMethod::Syn,
+        ScanMethod::TcpSyn,
         ip_addresses,
         port_numbers,
         std::time::Duration::from_secs(5),

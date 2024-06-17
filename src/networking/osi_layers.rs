@@ -252,7 +252,7 @@ impl DatalinkLayer {
         packet: &[u8],
         layers: Layer,
         val: u16,
-    ) -> Result<(Option<Vec<u8>>, Option<Duration>)> {
+    ) -> Result<(Option<Vec<u8>>, Duration)> {
         let channel = datalink::channel(&interface, Default::default())?;
 
         let (mut sender, mut receiver) = match channel {
@@ -276,6 +276,7 @@ impl DatalinkLayer {
             .ok_or(ChannelError::SendError)??;
 
         let timeout = Duration::from_secs(5);
+        
         let mut response_buffer = None;
         while send_time.elapsed() < timeout {
             if let Ok(response) = receiver.next() {
@@ -288,7 +289,7 @@ impl DatalinkLayer {
 
         let rtt = send_time.elapsed();
 
-        Ok((response_buffer, Some(rtt)))
+        Ok((response_buffer, rtt))
     }
 }
 
@@ -304,7 +305,7 @@ impl NetworkLayer {
         packet: &[u8],
         layers: Layer,
         val: u16,
-    ) -> Result<(Option<Vec<u8>>, Option<Duration>)> {
+    ) -> Result<(Option<Vec<u8>>, Duration)> {
         let dest_mac = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip)?;
 
         let interface = if NetworkLayer::is_dest_ip_loopback(src_ip, dest_ip) {
