@@ -18,6 +18,8 @@ pub enum ScannerError {
     CantCreateIcmpPacket,
     #[error("This IP protocol version is not supported.")]
     UnsupportedIpVersion,
+    #[error("Unexpected TCP flags set.")]
+    UnexpectedTcpFlags,
 }
 
 #[derive(Error, Debug)]

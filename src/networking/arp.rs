@@ -72,7 +72,7 @@ impl Arp {
     pub fn send_request(
         src_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
-    ) -> Result<(Option<MacAddr>, Option<Duration>)> {
+    ) -> Result<(Option<MacAddr>, Duration)> {
         let interface = match Interface::from_ip(src_ip) {
             Some(interface) => interface,
             None => return Err(ScannerError::CantFindInterface.into()),
@@ -107,12 +107,12 @@ impl Arp {
             ethernet_type,
             &arp_packet,
             layer,
-            0,
+            Duration::from_secs(5),
         )?;
 
         match response {
             Some(packet) => Ok((Arp::get_mac_address(&packet), rtt)),
-            None => Ok((None, None)),
+            None => Ok((None, rtt)),
         }
     }
 
@@ -179,9 +179,8 @@ mod tests {
         // Send an ARP request to the router. Parses the MAC address from the response.
         let (response, rtt) = Arp::send_request(src_ip, router_ip).unwrap();
 
-        // Ensure we received a response and round-trip time.
+        // Ensure we received a response.
         assert!(response.is_some());
-        assert!(rtt.is_some());
         Ok(())
     }
 

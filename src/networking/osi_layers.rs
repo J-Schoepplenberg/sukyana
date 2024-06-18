@@ -251,7 +251,7 @@ impl DatalinkLayer {
         ethernet_type: EtherType,
         packet: &[u8],
         layers: Layer,
-        val: u16,
+        timeout: Duration,
     ) -> Result<(Option<Vec<u8>>, Duration)> {
         let channel = datalink::channel(&interface, Default::default())?;
 
@@ -275,8 +275,6 @@ impl DatalinkLayer {
             .send_to(&ethernet_packet, Some(interface))
             .ok_or(ChannelError::SendError)??;
 
-        let timeout = Duration::from_secs(5);
-        
         let mut response_buffer = None;
         while send_time.elapsed() < timeout {
             if let Ok(response) = receiver.next() {
@@ -304,7 +302,7 @@ impl NetworkLayer {
         dest_ip: Ipv4Addr,
         packet: &[u8],
         layers: Layer,
-        val: u16,
+        timeout: Duration,
     ) -> Result<(Option<Vec<u8>>, Duration)> {
         let dest_mac = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip)?;
 
@@ -320,7 +318,7 @@ impl NetworkLayer {
             EtherTypes::Ipv4,
             packet,
             layers,
-            val,
+            timeout,
         )?;
 
         Ok((response, rtt))
@@ -403,6 +401,7 @@ impl NetworkLayer {
 mod tests {
     use super::*;
     use crate::networking::tcp::Tcp;
+    use pnet::packet::tcp::TcpFlags;
     use std::{os::windows::process::ExitStatusExt, process::Output};
 
     fn mock_system_route(output: Output, route: &str) -> Result<Ipv4Addr> {
@@ -453,14 +452,20 @@ mod tests {
         };
 
         // The packet should match all layers.
-        let tcp_packet_1 = Tcp::build_syn_packet(src_ip, src_port, dest_ip, dest_port);
+        let tcp_packet_1 =
+            Tcp::build_tcp_packet(src_ip, src_port, dest_ip, dest_port, TcpFlags::SYN);
         let ethernet_packet_1 =
             DatalinkLayer::build_ethernet_packet(src_mac, dest_mac, ethertype, &tcp_packet_1);
         assert!(transport_layer.match_packet(&ethernet_packet_1));
 
         // The packet should not match anymore since src_ip and dest_port are different.
-        let tcp_packet_2 =
-            Tcp::build_syn_packet(Ipv4Addr::new(10, 0, 0, 1), src_port, dest_ip, 443);
+        let tcp_packet_2 = Tcp::build_tcp_packet(
+            Ipv4Addr::new(10, 0, 0, 1),
+            src_port,
+            dest_ip,
+            443,
+            TcpFlags::SYN,
+        );
         let ethernet_packet_2 =
             DatalinkLayer::build_ethernet_packet(src_mac, dest_mac, ethertype, &tcp_packet_2);
         assert!(!transport_layer.match_packet(&ethernet_packet_2));
