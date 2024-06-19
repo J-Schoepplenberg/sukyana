@@ -40,7 +40,7 @@ pub fn icmp_scan(
 
     let (response, rtt) = Icmp::send_icmp_packet(ipv4_src, ipv4_dest, timeout)?;
 
-    // No response -> Down.
+    // No response -> down.
     let packet = match response {
         Some(packet) => packet,
         None => return Ok((ScanResult::Down, rtt)),
@@ -59,11 +59,11 @@ pub fn icmp_scan(
     let icmp_code = icmp_packet.get_icmp_code();
 
     match (icmp_type, icmp_code) {
-        // Unreachable -> Down.
+        // Unreachable -> down.
         (IcmpTypes::DestinationUnreachable, code) if icmp_codes.contains(&code) => {
             Ok((ScanResult::Down, rtt))
         }
-        // Echo reply -> Up.
+        // Echo reply -> up.
         (IcmpTypes::EchoReply, echo_reply::IcmpCodes::NoCode) => Ok((ScanResult::Up, rtt)),
         // Unexpected response.
         _ => Err(ScannerError::UnexpectedIcmpResponse.into()),

@@ -22,6 +22,8 @@ pub enum ScannerError {
     UnexpectedTcpFlags,
     #[error("Unexpected ICMP response.")]
     UnexpectedIcmpResponse,
+    #[error("Unexpected UDP response.")]
+    UnexpectedUdpResponse,
 }
 
 #[derive(Error, Debug)]

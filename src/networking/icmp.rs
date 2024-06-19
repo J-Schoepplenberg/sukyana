@@ -36,8 +36,7 @@ impl Icmp {
         ip_header.set_source(src_ip);
         ip_header.set_destination(dest_ip);
         ip_header.set_total_length((IPV4_HEADER_SIZE + ICMP_HEADER_SIZE + ICMP_DATA_SIZE) as u16);
-        let id = rng.gen();
-        ip_header.set_identification(id);
+        ip_header.set_identification(rng.gen());
         ip_header.set_flags(Ipv4Flags::DontFragment);
         ip_header.set_ttl(TTL);
         ip_header.set_next_level_protocol(ip::IpNextHeaderProtocols::Icmp);
