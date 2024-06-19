@@ -20,6 +20,8 @@ pub enum ScannerError {
     UnsupportedIpVersion,
     #[error("Unexpected TCP flags set.")]
     UnexpectedTcpFlags,
+    #[error("Unexpected ICMP response.")]
+    UnexpectedIcmpResponse,
 }
 
 #[derive(Error, Debug)]

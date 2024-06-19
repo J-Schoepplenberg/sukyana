@@ -16,16 +16,11 @@ async fn main() {
     let my_port = 12345;
 
     //let ip_addresses = vec![IpAddr::V4(Ipv4Addr::new(142, 251, 209, 131))];
+    //let ip_addresses = vec![IpAddr::V4(Ipv4Addr::new(142, 250, 184, 238))];
     let ip_addresses = vec![IpAddr::V4(Ipv4Addr::new(37, 187, 205, 99))];
     let port_numbers = vec![22, 80, 443, 8080, 8081];
     let timeout = std::time::Duration::from_secs(5);
 
-    let scanner = Scanner::new(
-        ScanMethod::TcpSyn,
-        ip_addresses,
-        port_numbers,
-        std::time::Duration::from_secs(5),
-    );
-
-    scanner.scan(my_ip, my_port, timeout).await;
+    //Scanner::scan(ScanMethod::TcpSyn, my_ip, my_port, &ip_addresses, &port_numbers, timeout).await;
+    Scanner::ping(my_ip, ip_addresses, timeout).await;
 }
