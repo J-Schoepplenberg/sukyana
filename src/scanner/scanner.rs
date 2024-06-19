@@ -6,7 +6,7 @@ use crate::{
         tcp_scan::{
             tcp_ack_scan, tcp_connect_scan, tcp_fin_scan, tcp_maimon_scan, tcp_null_scan,
             tcp_window_scan, tcp_xmas_scan,
-        },
+        }, udp_scan::udp_scan,
     },
 };
 use futures::future::join_all;
@@ -24,6 +24,7 @@ pub enum ScanMethod {
     TcpNull,
     TcpWindow,
     TcpMaimon,
+    Udp,
 }
 
 #[derive(Debug)]
@@ -58,6 +59,7 @@ impl Scanner {
             ScanMethod::TcpNull => tcp_null_scan,
             ScanMethod::TcpWindow => tcp_window_scan,
             ScanMethod::TcpMaimon => tcp_maimon_scan,
+            ScanMethod::Udp => udp_scan,
         };
         let mut handles = Vec::new();
         for socket in sockets {

@@ -9,7 +9,7 @@ use pnet::packet::{
 };
 use std::{net::IpAddr, time::Duration};
 
-/// Scans a host using ICMP echo requests.
+/// Scans a host using ICMP echo requests. Also known as a ping scan.
 ///
 /// Determines if a host is up or down. Might not work behind a firewall.
 pub fn icmp_scan(
@@ -29,15 +29,6 @@ pub fn icmp_scan(
         _ => Err(ScannerError::UnsupportedIpVersion)?,
     };
 
-    let icmp_codes = vec![
-        IcmpCodes::DestinationProtocolUnreachable,
-        IcmpCodes::DestinationHostUnreachable,
-        IcmpCodes::DestinationPortUnreachable,
-        IcmpCodes::NetworkAdministrativelyProhibited,
-        IcmpCodes::HostAdministrativelyProhibited,
-        IcmpCodes::CommunicationAdministrativelyProhibited,
-    ];
-
     let (response, rtt) = Icmp::send_icmp_packet(ipv4_src, ipv4_dest, timeout)?;
 
     // No response -> down.
@@ -55,6 +46,15 @@ pub fn icmp_scan(
     let icmp_packet =
         IcmpPacket::new(ipv4_packet.payload()).ok_or(ScannerError::CantCreateIcmpPacket)?;
 
+    let icmp_codes = vec![
+        IcmpCodes::DestinationProtocolUnreachable,
+        IcmpCodes::DestinationHostUnreachable,
+        IcmpCodes::DestinationPortUnreachable,
+        IcmpCodes::NetworkAdministrativelyProhibited,
+        IcmpCodes::HostAdministrativelyProhibited,
+        IcmpCodes::CommunicationAdministrativelyProhibited,
+    ];
+    
     let icmp_type = icmp_packet.get_icmp_type();
     let icmp_code = icmp_packet.get_icmp_code();
 
