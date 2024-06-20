@@ -22,11 +22,6 @@ impl Interface {
     pub fn from_ip(src_ip: Ipv4Addr) -> Option<NetworkInterface> {
         Self::find_interface(|&ipv4| ipv4 == src_ip)
     }
-
-    /// Attempts to find the network interface that has the loopback IP address.
-    pub fn from_loopback() -> Option<NetworkInterface> {
-        Self::find_interface(Ipv4Addr::is_loopback)
-    }
 }
 
 #[cfg(test)]

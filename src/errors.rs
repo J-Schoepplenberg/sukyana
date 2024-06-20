@@ -24,6 +24,12 @@ pub enum ScannerError {
     UnexpectedIcmpResponse,
     #[error("Unexpected UDP response.")]
     UnexpectedUdpResponse,
+    #[error("Unexpected Protocol response.")]
+    UnexpectedProtocolResponse,
+    #[error("Could not write results to a file.")]
+    CouldNotWriteResults,
+    #[error("Host did not respond to ARP request.")]
+    NoArpResponse,
 }
 
 #[derive(Error, Debug)]

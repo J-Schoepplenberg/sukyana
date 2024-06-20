@@ -2,16 +2,21 @@ use super::tcp_scan::tcp_syn_scan;
 use crate::{
     networking::socket_iterator,
     scanner::{
+        arp_scan::arp_scan,
         icmp_scan::icmp_scan,
         tcp_scan::{
             tcp_ack_scan, tcp_connect_scan, tcp_fin_scan, tcp_maimon_scan, tcp_null_scan,
             tcp_window_scan, tcp_xmas_scan,
-        }, udp_scan::udp_scan,
+        },
+        udp_scan::udp_scan,
     },
 };
+use anyhow::Result;
 use futures::future::join_all;
+use log::info;
+use pnet::util::MacAddr;
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     time::Duration,
 };
 
@@ -38,6 +43,8 @@ pub enum ScanResult {
     Down,
 }
 
+type ArpResult = Result<(Ipv4Addr, Result<(Option<MacAddr>, Duration), String>), String>;
+
 pub struct Scanner {}
 
 impl Scanner {
@@ -48,7 +55,7 @@ impl Scanner {
         ip_addresses: &Vec<IpAddr>,
         port_numbers: &Vec<u16>,
         timeout: Duration,
-    ) {
+    ) -> Vec<(SocketAddr, ScanResult, Duration)> {
         let sockets = socket_iterator::SocketIterator::new(ip_addresses, port_numbers);
         let scan_method = match method {
             ScanMethod::TcpSyn => tcp_syn_scan,
@@ -62,6 +69,7 @@ impl Scanner {
             ScanMethod::Udp => udp_scan,
         };
         let mut handles = Vec::new();
+        let mut total_sockets = 0;
         for socket in sockets {
             let handle = tokio::spawn(async move {
                 let status = tokio::task::spawn_blocking(move || {
@@ -72,28 +80,137 @@ impl Scanner {
                 (socket, status)
             });
             handles.push(handle);
+            total_sockets += 1;
         }
         let results = join_all(handles).await;
-        println!("{:?}", results);
-    }
 
-    pub async fn ping(src_ip: IpAddr, ip_addresses: Vec<IpAddr>, timeout: Duration) {
-        let mut handles = Vec::new();
-        for dest_ip in ip_addresses {
-            let handle = tokio::spawn(async move {
-                let status =
-                    tokio::task::spawn_blocking(move || icmp_scan(src_ip, 0, dest_ip, 0, timeout))
-                        .await
-                        .unwrap();
-                (dest_ip, status)
-            });
-            handles.push(handle);
+        let mut scanned_sockets = Vec::new();
+        let mut unreachable = 0;
+        let mut responses = 0;
+
+        for result in results {
+            match result {
+                Ok((dest_ip, Ok((status, rtt)))) => {
+                    scanned_sockets.push((dest_ip, status, rtt));
+                    responses += 1;
+                }
+                _ => {
+                    unreachable += 1;
+                }
+            }
         }
-        let results = join_all(handles).await;
-        println!("{:?}", results);
+
+        info!(
+            "{} sockets answered to your probe with a response.",
+            responses
+        );
+
+        info!("{} of {} sockets unreachable.", unreachable, total_sockets);
+
+        scanned_sockets
     }
 
-    pub fn save_results() {
-        todo!();
+    pub async fn ping(
+        src_ip: IpAddr,
+        ip_addresses: Vec<IpAddr>,
+        timeout: Duration,
+    ) -> Vec<(IpAddr, ScanResult, Duration)> {
+        let total_hosts = ip_addresses.len();
+
+        let handles: Vec<_> = ip_addresses
+            .into_iter()
+            .map(|dest_ip| {
+                tokio::spawn(async move {
+                    let status =
+                        tokio::task::spawn_blocking(move || icmp_scan(src_ip, dest_ip, timeout))
+                            .await
+                            .unwrap();
+                    (dest_ip, status)
+                })
+            })
+            .collect();
+
+        let results = join_all(handles).await;
+
+        let mut hosts = Vec::new();
+        let mut unreachable = 0;
+        let mut responses = 0;
+
+        for result in results {
+            match result {
+                Ok((dest_ip, Ok((status, rtt)))) => {
+                    hosts.push((dest_ip, status, rtt));
+                    responses += 1;
+                }
+                _ => {
+                    unreachable += 1;
+                }
+            }
+        }
+
+        info!(
+            "{} hosts answered to your ping with an ICMP response.",
+            responses
+        );
+
+        info!(
+            "{} of {} IP addresses unreachable.",
+            unreachable, total_hosts
+        );
+
+        hosts
+    }
+
+    /// Scans the local network with ARP requests.
+    ///
+    /// Returns IP addresses, MAC addresses, and round-trip times of hosts that responded.
+    pub async fn arp(
+        src_ip: IpAddr,
+        ip_addresses: Vec<IpAddr>,
+        timeout: Duration,
+    ) -> Vec<(IpAddr, MacAddr, Duration)> {
+        let total_hosts = ip_addresses.len();
+
+        let handles: Vec<_> = ip_addresses
+            .into_iter()
+            .map(|dest_ip| {
+                tokio::spawn(async move {
+                    let status =
+                        tokio::task::spawn_blocking(move || arp_scan(src_ip, dest_ip, timeout))
+                            .await
+                            .unwrap();
+                    (dest_ip, status)
+                })
+            })
+            .collect();
+
+        let results = join_all(handles).await;
+
+        let mut hosts = Vec::new();
+        let mut unreachable = 0;
+        let mut responses = 0;
+
+        for result in results {
+            match result {
+                Ok((dest_ip, Ok((Some(mac), rtt)))) => {
+                    responses += 1;
+                    hosts.push((dest_ip, mac, rtt));
+                }
+                Ok((_, Ok((None, _)))) | _ => {
+                    unreachable += 1;
+                }
+            }
+        }
+
+        info!(
+            "{} hosts in your local network answered with an ARP response.",
+            responses
+        );
+        info!(
+            "{} of {} IP addresses unreachable.",
+            unreachable, total_hosts
+        );
+
+        hosts
     }
 }

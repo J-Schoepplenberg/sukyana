@@ -70,7 +70,7 @@ pub fn udp_scan(
                 _ => return Err(ScannerError::UnexpectedIcmpResponse.into()),
             }
         }
-        // Unexpected UDP response.
-        _ => return Err(ScannerError::UnexpectedUdpResponse.into()),
+        // Unexpected response.
+        _ => return Err(ScannerError::UnexpectedProtocolResponse.into()),
     }
 }

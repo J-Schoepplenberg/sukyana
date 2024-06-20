@@ -4,6 +4,7 @@ use crate::{
     networking::arp::Arp,
 };
 use anyhow::Result;
+use netdev::get_default_gateway;
 use pnet::{
     datalink::{self, Channel, NetworkInterface},
     packet::{
@@ -19,28 +20,11 @@ use pnet::{
 };
 use std::{
     net::{IpAddr, Ipv4Addr},
-    process::Command,
     time::{Duration, Instant},
 };
 
-// Constants based on the operating system.
-cfg_if::cfg_if! {
-    if #[cfg(target_os = "windows")] {
-        const ROUTE_COMMAND: &str = "powershell";
-        const ROUTE_ARGS: [&str; 2] = ["route", "print"];
-        const ROUTE_INDICATOR: &str = "0.0.0.0";
-    } else if #[cfg(target_os = "linux")] {
-        const ROUTE_COMMAND: &str = "bash";
-        const ROUTE_ARGS: [&str; 1] = ["-c ip route"];
-        const ROUTE_INDICATOR: &str = "default";
-    } else {
-        compile_error!("Unsupported operating system");
-    }
-}
-
 const ETHERNET_BUFFER_SIZE: usize = 4096;
 const ETHERNET_HEADER_SIZE: usize = 14;
-const NEIGHBOR_CACHE_MAX_TRY: usize = 3;
 
 /// Represents the different layers of the OSI model.
 pub enum Layer {
@@ -279,6 +263,7 @@ impl DatalinkLayer {
             .ok_or(ChannelError::SendError)??;
 
         let mut response_buffer = None;
+        
         while send_time.elapsed() < timeout {
             if let Ok(response) = receiver.next() {
                 if layers.match_layer(response) {
@@ -307,13 +292,9 @@ impl NetworkLayer {
         layers: Layer,
         timeout: Duration,
     ) -> Result<(Option<Vec<u8>>, Duration)> {
-        let dest_mac = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip)?;
+        let dest_mac = NetworkLayer::get_dest_mac_address(src_ip, dest_ip, timeout)?;
 
-        let interface = if NetworkLayer::is_dest_ip_loopback(src_ip, dest_ip) {
-            Interface::from_loopback().ok_or(ScannerError::CantFindInterface)?
-        } else {
-            Interface::from_ip(src_ip).ok_or(ScannerError::CantFindInterface)?
-        };
+        let interface = Interface::from_ip(src_ip).ok_or(ScannerError::CantFindInterface)?;
 
         let (response, rtt) = DatalinkLayer::send_and_receive(
             interface,
@@ -329,35 +310,51 @@ impl NetworkLayer {
 
     /// Attempts to determine the MAC address of the given `dest_ip`.
     ///
-    /// If `dest_ip` is local, the MAC address is set to zero or resolved using the system's ARP cache.
+    /// If `dest_ip` is local, the MAC address is set to zero or resolved using ARP.
     ///
-    /// Otherwise, returns the resolved MAC address of the default gateway.
-    pub fn get_dest_mac_addres(src_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> Result<MacAddr> {
+    /// Otherwise, returns the MAC address of the default gateway.
+    pub fn get_dest_mac_address(
+        src_ip: Ipv4Addr,
+        dest_ip: Ipv4Addr,
+        timeout: Duration,
+    ) -> Result<MacAddr> {
         if NetworkLayer::is_dest_ip_local(dest_ip) {
             if NetworkLayer::is_dest_ip_loopback(src_ip, dest_ip) {
+                // Loopback address.
                 Ok(MacAddr::zero())
             } else {
-                NetworkLayer::resolve_mac_address(src_ip, dest_ip)
+                // Resolve MAC address in local network.
+                NetworkLayer::resolve_mac_address(src_ip, dest_ip, timeout)
             }
         } else {
-            let router_ip = NetworkLayer::get_default_route_ip()?;
-            NetworkLayer::resolve_mac_address(src_ip, router_ip)
+            // Mac address of the default gateway.
+            let default_gateway = get_default_gateway()
+                .ok()
+                .ok_or(ScannerError::CantFindRouterAddress)?;
+            let mac_addr = MacAddr::new(
+                default_gateway.mac_addr.0,
+                default_gateway.mac_addr.1,
+                default_gateway.mac_addr.2,
+                default_gateway.mac_addr.3,
+                default_gateway.mac_addr.4,
+                default_gateway.mac_addr.5,
+            );
+            Ok(mac_addr)
         }
     }
 
-    /// Attempts to resolve the MAC address of the given `dest_ip`.
+    /// Attempts to resolve the MAC address of some IP address in the local network.
     ///
-    /// First searches the system's ARP cache, then sends an ARP request if the MAC address is not found.
-    pub fn resolve_mac_address(src_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> Result<MacAddr> {
-        Arp::search_neighbor_cache(dest_ip.into())?
-            .or_else(|| {
-                (0..NEIGHBOR_CACHE_MAX_TRY).find_map(|_| {
-                    Arp::send_request(src_ip, dest_ip)
-                        .ok()
-                        .and_then(|(mac, _)| mac)
-                })
-            })
-            .ok_or(ScannerError::CantFindMacAddress.into())
+    /// Sends an ARP request to the `dest_ip` and waits for a response.
+    pub fn resolve_mac_address(
+        src_ip: Ipv4Addr,
+        dest_ip: Ipv4Addr,
+        timeout: Duration,
+    ) -> Result<MacAddr> {
+        Arp::send_request(src_ip, dest_ip, timeout)
+            .ok()
+            .and_then(|(mac, _)| mac)
+            .ok_or(ScannerError::NoArpResponse.into())
     }
 
     /// Check if `dest_ip` and `src_ip` are the same or if `dest_ip` is a loopback address.
@@ -376,27 +373,6 @@ impl NetworkLayer {
                 .iter()
                 .any(|ip_network| ip_network.contains(IpAddr::V4(dest_ip)))
         })
-    }
-
-    /// Retrieves the IP address of the default gateway.
-    ///
-    /// Issues a `Command` to get the system's routing table.
-    ///
-    /// The output from the launched program is parsed to find the default route.
-    pub fn get_default_route_ip() -> Result<Ipv4Addr> {
-        let output = Command::new(ROUTE_COMMAND).args(&ROUTE_ARGS).output()?;
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let lines = stdout.lines();
-        for line in lines {
-            if line.contains(ROUTE_INDICATOR) {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() > 2 {
-                    let route_ip: Ipv4Addr = parts[2].parse()?;
-                    return Ok(route_ip);
-                }
-            }
-        }
-        Err(ScannerError::CantFindRouterAddress.into())
     }
 }
 
@@ -479,13 +455,15 @@ mod tests {
         // Test with a local IP address.
         let src_ip = Ipv4Addr::new(127, 0, 0, 1);
         let dest_ip = Ipv4Addr::new(127, 0, 0, 1);
-        let mac = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip);
+        let timeout = Duration::from_secs(5);
+        let mac = NetworkLayer::get_dest_mac_address(src_ip, dest_ip, timeout);
         assert!(mac.is_ok());
         assert_eq!(mac.unwrap(), MacAddr::zero());
 
         // Test with a non-local IP address.
         let dest_ip_remote = Ipv4Addr::new(8, 8, 8, 8);
-        let mac_remote = NetworkLayer::get_dest_mac_addres(src_ip, dest_ip_remote);
+        let timeout = Duration::from_secs(5);
+        let mac_remote = NetworkLayer::get_dest_mac_address(src_ip, dest_ip_remote, timeout);
         assert!(mac_remote.is_ok());
         assert_ne!(mac_remote.unwrap(), MacAddr::zero());
     }

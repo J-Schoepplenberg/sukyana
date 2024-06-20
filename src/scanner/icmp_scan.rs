@@ -14,9 +14,7 @@ use std::{net::IpAddr, time::Duration};
 /// Determines if a host is up or down. Might not work behind a firewall.
 pub fn icmp_scan(
     src_ip: IpAddr,
-    _src_port: u16,
     dest_ip: IpAddr,
-    _dest_port: u16,
     timeout: Duration,
 ) -> Result<(ScanResult, Duration)> {
     let ipv4_src = match src_ip {
