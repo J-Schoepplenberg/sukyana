@@ -13,6 +13,8 @@ use std::{net::IpAddr, time::Duration};
 /// Scans a host using UDP packets. Determines if a port is open, closed, or filtered.
 /// 
 /// Most popular services run over TCP, but UDP is used for services like DNS, DHCP, and SNMP.
+/// 
+/// Since UDP is connectionless, it's not as reliable as TCP to receive a response.
 pub fn udp_scan(
     src_ip: IpAddr,
     src_port: u16,

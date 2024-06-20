@@ -1,7 +1,7 @@
 use super::osi_layers::{Layer, NetworkLayer, TransportLayer};
 use anyhow::Result;
 use pnet::packet::{
-    ip,
+    ip::IpNextHeaderProtocols,
     ipv4::{self, Ipv4Flags, MutableIpv4Packet},
     udp::{ipv4_checksum, MutableUdpPacket},
 };
@@ -10,7 +10,7 @@ use std::{net::Ipv4Addr, time::Duration};
 
 const IPV4_HEADER_SIZE: usize = 20;
 const UDP_HEADER_SIZE: usize = 8;
-const UDP_DATA_SIZE: usize = 0;
+const UDP_DATA_SIZE: usize = 20;
 const TTL: u8 = 64;
 
 pub struct Udp;
@@ -35,7 +35,7 @@ impl Udp {
         ip_header.set_identification(rng.gen());
         ip_header.set_flags(Ipv4Flags::DontFragment);
         ip_header.set_ttl(TTL);
-        ip_header.set_next_level_protocol(ip::IpNextHeaderProtocols::Udp);
+        ip_header.set_next_level_protocol(IpNextHeaderProtocols::Udp);
         let ip_checksum = ipv4::checksum(&ip_header.to_immutable());
         ip_header.set_checksum(ip_checksum);
 
@@ -43,6 +43,7 @@ impl Udp {
         udp_header.set_source(src_port);
         udp_header.set_destination(dest_port);
         udp_header.set_length((UDP_HEADER_SIZE + UDP_DATA_SIZE) as u16);
+        udp_header.set_payload(&vec![0x41; UDP_DATA_SIZE]);
         let udp_checksum = ipv4_checksum(&udp_header.to_immutable(), &src_ip, &dest_ip);
         udp_header.set_checksum(udp_checksum);
 

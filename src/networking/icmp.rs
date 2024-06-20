@@ -5,7 +5,7 @@ use pnet::packet::{
         self, destination_unreachable::IcmpCodes, echo_request::MutableEchoRequestPacket,
         IcmpTypes, MutableIcmpPacket,
     },
-    ip,
+    ip::IpNextHeaderProtocols,
     ipv4::{self, Ipv4Flags, MutableIpv4Packet},
 };
 use rand::Rng;
@@ -39,7 +39,7 @@ impl Icmp {
         ip_header.set_identification(rng.gen());
         ip_header.set_flags(Ipv4Flags::DontFragment);
         ip_header.set_ttl(TTL);
-        ip_header.set_next_level_protocol(ip::IpNextHeaderProtocols::Icmp);
+        ip_header.set_next_level_protocol(IpNextHeaderProtocols::Icmp);
         let ip_checksum = ipv4::checksum(&ip_header.to_immutable());
         ip_header.set_checksum(ip_checksum);
 
@@ -67,7 +67,7 @@ impl Icmp {
     }
 
     /// Sends an ICMP packet and parses the response.
-    /// 
+    ///
     /// The packet is handed over to the transport layer.
     pub fn send_icmp_packet(
         src_ip: Ipv4Addr,

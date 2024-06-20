@@ -44,11 +44,6 @@ pub struct Arp;
 
 impl Arp {
     /// Constructs an ARP packet.
-    /// 
-    /// Sets:
-    /// - Source MAC address.
-    /// - Source IP address.
-    /// - Destination IP address.
     pub fn build_arp_packet(src_mac: MacAddr, src_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> [u8; 28] {
         let mut arp_packet = [0u8; 28];
         let mut arp_header = MutableArpPacket::new(&mut arp_packet).unwrap();

@@ -7,7 +7,13 @@ use anyhow::Result;
 use pnet::{
     datalink::{self, Channel, NetworkInterface},
     packet::{
-        arp::ArpPacket, ethernet::{EtherType, EtherTypes, EthernetPacket, MutableEthernetPacket}, icmp::{IcmpPacket, IcmpTypes}, ip::IpNextHeaderProtocols, ipv4::Ipv4Packet, tcp::TcpPacket, Packet
+        arp::ArpPacket,
+        ethernet::{EtherType, EtherTypes, EthernetPacket, MutableEthernetPacket},
+        ip::IpNextHeaderProtocols,
+        ipv4::Ipv4Packet,
+        tcp::TcpPacket,
+        udp::UdpPacket,
+        Packet,
     },
     util::MacAddr,
 };
@@ -194,10 +200,10 @@ impl MatchLayer for TransportLayer {
                 };
 
                 match ipv4_packet.get_next_level_protocol() {
-                    IpNextHeaderProtocols::Tcp => {
-                        TcpPacket::new(ipv4_packet.payload())
-                        .map(|tcp| (tcp.get_source(), tcp.get_destination()))
-                    }
+                    IpNextHeaderProtocols::Tcp => TcpPacket::new(ipv4_packet.payload())
+                        .map(|tcp| (tcp.get_source(), tcp.get_destination())),
+                    IpNextHeaderProtocols::Udp => UdpPacket::new(ipv4_packet.payload())
+                        .map(|udp| (udp.get_source(), udp.get_destination())),
                     IpNextHeaderProtocols::Icmp => return true,
                     _ => None,
                 }
