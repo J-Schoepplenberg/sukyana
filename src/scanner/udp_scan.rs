@@ -1,4 +1,4 @@
-use super::scanner::ScanResult;
+use super::engine::ScanResult;
 use crate::{
     errors::ScannerError,
     networking::{interface::Interface, udp::Udp},
@@ -53,7 +53,7 @@ pub fn udp_scan(
 
     match ipv4_packet.get_next_level_protocol() {
         // Any response -> open.
-        IpNextHeaderProtocols::Udp => return Ok((ScanResult::Open, rtt)),
+        IpNextHeaderProtocols::Udp => Ok((ScanResult::Open, rtt)),
         IpNextHeaderProtocols::Icmp => {
             let icmp_packet =
                 IcmpPacket::new(ipv4_packet.payload()).ok_or(ScannerError::CantCreateIcmpPacket)?;
@@ -68,14 +68,14 @@ pub fn udp_scan(
             let icmp_code = icmp_packet.get_icmp_code();
             match icmp_code {
                 // ICMP port unreachable -> closed.
-                code if codes_1.contains(&code) => return Ok((ScanResult::Closed, rtt)),
+                code if codes_1.contains(&code) => Ok((ScanResult::Closed, rtt)),
                 // Other ICMP unreachable errors -> filtered.
-                code if codes_2.contains(&code) => return Ok((ScanResult::Filtered, rtt)),
+                code if codes_2.contains(&code) => Ok((ScanResult::Filtered, rtt)),
                 // Unexpected ICMP response.
-                _ => return Err(ScannerError::UnexpectedIcmpResponse.into()),
+                _ => Err(ScannerError::UnexpectedIcmpResponse.into()),
             }
         }
         // Unexpected response.
-        _ => return Err(ScannerError::UnexpectedProtocolResponse.into()),
+        _ => Err(ScannerError::UnexpectedProtocolResponse.into()),
     }
 }

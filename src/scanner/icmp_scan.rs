@@ -1,4 +1,4 @@
-use super::scanner::ScanResult;
+use super::engine::ScanResult;
 use crate::{
     errors::ScannerError,
     networking::{icmp::Icmp, interface::Interface},
@@ -48,7 +48,7 @@ pub fn icmp_scan(
     let icmp_packet =
         IcmpPacket::new(ipv4_packet.payload()).ok_or(ScannerError::CantCreateIcmpPacket)?;
 
-    let icmp_codes = vec![
+    let icmp_codes = [
         IcmpCodes::DestinationProtocolUnreachable,
         IcmpCodes::DestinationHostUnreachable,
         IcmpCodes::DestinationPortUnreachable,

@@ -1,4 +1,4 @@
-use crate::{errors::ScannerError, scanner::scanner::ScanResult};
+use crate::{errors::ScannerError, scanner::engine::ScanResult};
 use anyhow::Result;
 use pnet::util::MacAddr;
 use std::{env, io::Write, net::{IpAddr, SocketAddr}, time::Duration};

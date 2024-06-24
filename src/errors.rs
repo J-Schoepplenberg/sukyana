@@ -4,8 +4,14 @@ use thiserror::Error;
 pub enum ScannerError {
     #[error("Cannot find an interface.")]
     CantFindInterface,
-    #[error("Cannot find a MAC address.")]
-    CantFindMacAddress,
+    #[error("Cannot find an IP address for the interface.")]
+    CantFindInterfaceIp,
+    #[error("Cannot find a MAC address for the interface.")]
+    CantFindInterfaceMac,
+    #[error("Cannot find a gateway associated with the interface.")]
+    CantFindGateway,
+    #[error("Cannot find an IP address for the gateway.")]
+    CantFindGatewayIp,
     #[error("Cannot create an Ethernet packet.")]
     CantCreateEthernetPacket,
     #[error("Cannot create an IPv4 packet.")]
@@ -24,14 +30,6 @@ pub enum ScannerError {
     UnexpectedProtocolResponse,
     #[error("Could not write results to a file.")]
     CouldNotWriteResults,
-    #[error("Cannot find a gateway associated with the interface.")]
-    CantFindGateway,
-    #[error("Cannot find an IP address for the gateway.")]
-    CantFindGatewayIp,
-    #[error("Cannot find an IP address for the interface.")]
-    CantFindInterfaceIp,
-    #[error("Cannot find a MAC address for the interface.")]
-    CantFindInterfaceMac,
 }
 
 #[derive(Error, Debug)]

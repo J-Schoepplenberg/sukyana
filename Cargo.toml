@@ -2,6 +2,12 @@
 name = "sukyana"
 version = "1.0.0"
 authors = ["Jannis Schoepplenberg <jschoe@proton.me>"]
+description = "A high-performance, robust, low-level port scanner and flooder written in pure, safe Rust."
+keywords = ["networking", "cybersecurity", "port-scanner", "flooder", "network-security"]
+categories = ["cybersecurity", "networking", "port-scanning", "flooding", "network-security"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/J-Schoepplenberg/sukyana"
 edition = "2021"
 rust-version = "1.73"
 
@@ -11,6 +17,7 @@ strip = false
 
 [dependencies]
 anyhow = "1.0.86"
+cfg-if = "1.0.0"
 clap = { version = "4.4.7", features = ["derive"] }
 env_logger = "0.11.3"
 futures = "0.3.30"
@@ -19,6 +26,8 @@ log = "0.4.21"
 netdev = "0.29.0"
 pnet = "0.35.0"
 rand = "0.8.5"
+serde = { version = "1.0", features = ["derive"] }
 subnetwork = "0.4.3"
 thiserror = "1.0.61"
 tokio = { version = "1.38.0", features = ["full"] }
+toml = "0.8.14"

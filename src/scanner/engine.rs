@@ -50,8 +50,8 @@ impl Scanner {
         method: ScanMethod,
         src_ip: IpAddr,
         src_port: u16,
-        ip_addresses: &Vec<IpAddr>,
-        port_numbers: &Vec<u16>,
+        ip_addresses: &[IpAddr],
+        port_numbers: &[u16],
         timeout: Duration,
     ) -> Vec<(SocketAddr, ScanResult, Duration)> {
         let sockets = socket_iterator::SocketIterator::new(ip_addresses, port_numbers);
@@ -205,7 +205,7 @@ impl Scanner {
                     responses += 1;
                     hosts.push((dest_ip, mac, rtt));
                 }
-                Ok((_, Ok((None, _)))) | _ => {
+                _ => {
                     unreachable += 1;
                 }
             }

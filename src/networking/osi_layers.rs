@@ -24,6 +24,7 @@ const ETHERNET_BUFFER_SIZE: usize = 4096;
 const ETHERNET_HEADER_SIZE: usize = 14;
 
 /// Represents the different layers of the OSI model.
+#[allow(dead_code)]
 pub enum Layer {
     Two(DatalinkLayer),
     Three(NetworkLayer),

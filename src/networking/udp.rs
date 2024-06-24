@@ -46,7 +46,7 @@ impl Udp {
         udp_header.set_source(src_port);
         udp_header.set_destination(dest_port);
         udp_header.set_length((UDP_HEADER_SIZE + UDP_DATA_SIZE) as u16);
-        udp_header.set_payload(&vec![0x41; UDP_DATA_SIZE]);
+        udp_header.set_payload(&[0x41; UDP_DATA_SIZE]);
         let udp_checksum = ipv4_checksum(&udp_header.to_immutable(), &src_ip, &dest_ip);
         udp_header.set_checksum(udp_checksum);
 

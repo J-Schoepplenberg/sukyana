@@ -1,4 +1,4 @@
-use super::scanner::ScanResult;
+use super::engine::ScanResult;
 use crate::{
     errors::ScannerError,
     networking::{interface::Interface, tcp::Tcp},

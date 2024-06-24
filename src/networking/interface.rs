@@ -4,17 +4,28 @@ use netdev::{get_default_interface, ip::Ipv4Net, NetworkDevice};
 use pnet::util::MacAddr;
 use std::net::Ipv4Addr;
 
+// Constants based on the operating system.
+cfg_if::cfg_if! {
+    if #[cfg(target_os = "windows")] {
+        const NAME_PREFIX: &str = "\\Device\\NPF_";
+    } else if #[cfg(target_os = "linux")] {
+        const NAME_PREFIX: &str = "";
+    } else {
+        compile_error!("Unsupported operating system.");
+    }
+}
+
 /// Represents a network interface with an IP address, MAC address, and gateway.
 ///
 /// Retrieving the list of all interfaces in every tokio task to determine which
-/// interface to use is very expensive, therefore we get the interface already 
-/// ahead of time for all tasks for performance reasons. 
-/// 
+/// interface to use is very expensive, therefore we get the interface already
+/// ahead of time for all tasks for performance reasons.
+///
 /// Later we need to convert the struct to `pnet::datalink::NetworkInterface`.
 ///
 /// To store the name we use the fact that the maximum length of an interface name is
 /// 256 bytes on Windows (`MAX_ADAPTER_NAME_LENGTH`) and 16 bytes on Linux (`IFNAMSIZ`).
-/// This enables us to store the name in a fixed-size array and makes it possible to 
+/// This enables us to store the name in a fixed-size array and makes it possible to
 /// easily pass the struct around.
 #[derive(Clone, Copy, Debug)]
 pub struct Interface {
@@ -36,9 +47,11 @@ impl Interface {
             .ok_or(ScannerError::CantFindInterface)?;
         let ip = *interface
             .ipv4
-            .get(0)
+            .first()
             .ok_or(ScannerError::CantFindInterfaceIp)?;
-        let mac = interface.mac_addr.ok_or(ScannerError::CantFindInterfaceMac)?;
+        let mac = interface
+            .mac_addr
+            .ok_or(ScannerError::CantFindInterfaceMac)?;
         let name = Interface::string_to_fixed_bytes(&interface.name);
         let gateway = Gateway::new(interface.gateway)?;
         let iface = Interface {
@@ -71,7 +84,8 @@ impl Interface {
         Ok(pnet::datalink::NetworkInterface {
             index: self.index,
             name: format!(
-                "\\Device\\NPF_{}",
+                "{}{}",
+                NAME_PREFIX,
                 Interface::fixed_bytes_to_string(&self.name)
             ),
             description: "".to_string(),
@@ -96,7 +110,7 @@ impl Gateway {
         let gateway = gateway.ok_or(ScannerError::CantFindGateway)?;
         let ip = gateway
             .ipv4
-            .get(0)
+            .first()
             .ok_or(ScannerError::CantFindGatewayIp)?;
         let mac = convert_mac_addr(gateway.mac_addr);
         Ok(Gateway { ip: *ip, mac })
