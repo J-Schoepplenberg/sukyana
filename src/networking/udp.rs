@@ -1,4 +1,7 @@
-use super::osi_layers::{Layer, NetworkLayer, TransportLayer};
+use super::{
+    interface::Interface,
+    osi_layers::{Layer, NetworkLayer, TransportLayer},
+};
 use anyhow::Result;
 use pnet::packet::{
     ip::IpNextHeaderProtocols,
@@ -51,6 +54,7 @@ impl Udp {
     }
 
     pub fn send_udp_packet(
+        interface: Interface,
         src_ip: Ipv4Addr,
         src_port: u16,
         dest_ip: Ipv4Addr,
@@ -73,8 +77,7 @@ impl Udp {
 
         let layers = Layer::Four(transport_layer);
 
-        let (response, rtt) =
-            NetworkLayer::send_and_receive(src_ip, dest_ip, &packet, layers, timeout)?;
+        let (response, rtt) = NetworkLayer::send_and_receive(interface, &packet, layers, timeout)?;
 
         Ok((response, rtt))
     }

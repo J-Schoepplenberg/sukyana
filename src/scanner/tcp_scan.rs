@@ -1,5 +1,8 @@
 use super::scanner::ScanResult;
-use crate::{errors::ScannerError, networking::tcp::Tcp};
+use crate::{
+    errors::ScannerError,
+    networking::{interface::Interface, tcp::Tcp},
+};
 use anyhow::Result;
 use pnet::packet::{
     ethernet::EthernetPacket,
@@ -25,6 +28,7 @@ use std::{
 /// A closed port will respond with a RST flag. No response indicates a filtered port.
 /// Filtered ports may also respond with an ICMP Type 3 unreachable error, but we can ignore this.
 pub fn tcp_syn_scan(
+    interface: Interface,
     src_ip: IpAddr,
     src_port: u16,
     dest_ip: IpAddr,
@@ -42,6 +46,7 @@ pub fn tcp_syn_scan(
     };
 
     let (response, rtt) = Tcp::send_tcp_packet(
+        interface,
         ipv4_src,
         src_port,
         ipv4_dest,
@@ -94,6 +99,7 @@ pub fn tcp_syn_scan(
 /// Involves sending a signifcant number of packets and is therefore slower than a SYN scan.
 /// It also causes considerable noise in event logs and is easily detected.
 pub fn tcp_connect_scan(
+    _interface: Interface,
     _src_ip: IpAddr,
     _src_port: u16,
     dest_ip: IpAddr,
@@ -118,6 +124,7 @@ pub fn tcp_connect_scan(
 /// RFC 793 expected behavior is that unfiltered open and closed ports will respond with a RST flag.
 /// If no response is received, the port is likely filtered.
 pub fn tcp_ack_scan(
+    interface: Interface,
     src_ip: IpAddr,
     src_port: u16,
     dest_ip: IpAddr,
@@ -135,6 +142,7 @@ pub fn tcp_ack_scan(
     };
 
     let (response, rtt) = Tcp::send_tcp_packet(
+        interface,
         ipv4_src,
         src_port,
         ipv4_dest,
@@ -180,6 +188,7 @@ pub fn tcp_ack_scan(
 /// RFC 793 expected behavior is that a closed port will respond with a RST flag.
 /// An open port will ignore the packet.
 pub fn tcp_fin_scan(
+    interface: Interface,
     src_ip: IpAddr,
     src_port: u16,
     dest_ip: IpAddr,
@@ -197,6 +206,7 @@ pub fn tcp_fin_scan(
     };
 
     let (response, rtt) = Tcp::send_tcp_packet(
+        interface,
         ipv4_src,
         src_port,
         ipv4_dest,
@@ -244,6 +254,7 @@ pub fn tcp_fin_scan(
 /// RFC 793 expected behavior is that a closed port will respond with a RST flag.
 /// An open port ignores packets with out-of-state flags.
 pub fn tcp_xmas_scan(
+    interface: Interface,
     src_ip: IpAddr,
     src_port: u16,
     dest_ip: IpAddr,
@@ -261,6 +272,7 @@ pub fn tcp_xmas_scan(
     };
 
     let (response, rtt) = Tcp::send_tcp_packet(
+        interface,
         ipv4_src,
         src_port,
         ipv4_dest,
@@ -307,6 +319,7 @@ pub fn tcp_xmas_scan(
 /// RFC 793 expected behavior is that a closed port will respond with a RST flag.
 /// An open port will ignore the packet.
 pub fn tcp_null_scan(
+    interface: Interface,
     src_ip: IpAddr,
     src_port: u16,
     dest_ip: IpAddr,
@@ -323,8 +336,9 @@ pub fn tcp_null_scan(
         _ => Err(ScannerError::UnsupportedIpVersion)?,
     };
 
-    let (response, rtt) =
-        Tcp::send_tcp_packet(ipv4_src, src_port, ipv4_dest, dest_port, 0, timeout)?;
+    let (response, rtt) = Tcp::send_tcp_packet(
+        interface, ipv4_src, src_port, ipv4_dest, dest_port, 0, timeout,
+    )?;
 
     // No response -> open or filtered.
     let packet = match response {
@@ -362,6 +376,7 @@ pub fn tcp_null_scan(
 ///
 /// Thus, it does not list ports as unfiltered, but determines if a port is open or closed.
 pub fn tcp_window_scan(
+    interface: Interface,
     src_ip: IpAddr,
     src_port: u16,
     dest_ip: IpAddr,
@@ -379,6 +394,7 @@ pub fn tcp_window_scan(
     };
 
     let (response, rtt) = Tcp::send_tcp_packet(
+        interface,
         ipv4_src,
         src_port,
         ipv4_dest,
@@ -430,6 +446,7 @@ pub fn tcp_window_scan(
 /// Expected behavior is that a closed port will respond with a RST flag.
 /// An open port should also respond with a RST flag, but many systems ignore this packet.
 pub fn tcp_maimon_scan(
+    interface: Interface,
     src_ip: IpAddr,
     src_port: u16,
     dest_ip: IpAddr,
@@ -447,6 +464,7 @@ pub fn tcp_maimon_scan(
     };
 
     let (response, rtt) = Tcp::send_tcp_packet(
+        interface,
         ipv4_src,
         src_port,
         ipv4_dest,

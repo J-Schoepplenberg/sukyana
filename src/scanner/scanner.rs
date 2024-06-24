@@ -1,6 +1,6 @@
 use super::tcp_scan::tcp_syn_scan;
 use crate::{
-    networking::socket_iterator,
+    networking::{interface::Interface, socket_iterator},
     scanner::{
         arp_scan::arp_scan,
         icmp_scan::icmp_scan,
@@ -11,12 +11,11 @@ use crate::{
         udp_scan::udp_scan,
     },
 };
-use anyhow::Result;
 use futures::future::join_all;
 use log::info;
 use pnet::util::MacAddr;
 use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{IpAddr, SocketAddr},
     time::Duration,
 };
 
@@ -43,12 +42,11 @@ pub enum ScanResult {
     Down,
 }
 
-type ArpResult = Result<(Ipv4Addr, Result<(Option<MacAddr>, Duration), String>), String>;
-
-pub struct Scanner {}
+pub struct Scanner;
 
 impl Scanner {
     pub async fn scan(
+        interface: Interface,
         method: ScanMethod,
         src_ip: IpAddr,
         src_port: u16,
@@ -73,7 +71,14 @@ impl Scanner {
         for socket in sockets {
             let handle = tokio::spawn(async move {
                 let status = tokio::task::spawn_blocking(move || {
-                    scan_method(src_ip, src_port, socket.ip(), socket.port(), timeout)
+                    scan_method(
+                        interface,
+                        src_ip,
+                        src_port,
+                        socket.ip(),
+                        socket.port(),
+                        timeout,
+                    )
                 })
                 .await
                 .unwrap();
@@ -100,17 +105,18 @@ impl Scanner {
             }
         }
 
-        info!(
-            "{} sockets answered to your probe with a response.",
-            responses
-        );
+        info!("{} sockets have been scanned.", responses);
 
-        info!("{} of {} sockets unreachable.", unreachable, total_sockets);
+        info!(
+            "{} of {} sockets ran on an error.",
+            unreachable, total_sockets
+        );
 
         scanned_sockets
     }
 
     pub async fn ping(
+        interface: Interface,
         src_ip: IpAddr,
         ip_addresses: Vec<IpAddr>,
         timeout: Duration,
@@ -121,10 +127,11 @@ impl Scanner {
             .into_iter()
             .map(|dest_ip| {
                 tokio::spawn(async move {
-                    let status =
-                        tokio::task::spawn_blocking(move || icmp_scan(src_ip, dest_ip, timeout))
-                            .await
-                            .unwrap();
+                    let status = tokio::task::spawn_blocking(move || {
+                        icmp_scan(interface, src_ip, dest_ip, timeout)
+                    })
+                    .await
+                    .unwrap();
                     (dest_ip, status)
                 })
             })
@@ -165,6 +172,7 @@ impl Scanner {
     ///
     /// Returns IP addresses, MAC addresses, and round-trip times of hosts that responded.
     pub async fn arp(
+        interface: Interface,
         src_ip: IpAddr,
         ip_addresses: Vec<IpAddr>,
         timeout: Duration,
@@ -175,10 +183,11 @@ impl Scanner {
             .into_iter()
             .map(|dest_ip| {
                 tokio::spawn(async move {
-                    let status =
-                        tokio::task::spawn_blocking(move || arp_scan(src_ip, dest_ip, timeout))
-                            .await
-                            .unwrap();
+                    let status = tokio::task::spawn_blocking(move || {
+                        arp_scan(interface, src_ip, dest_ip, timeout)
+                    })
+                    .await
+                    .unwrap();
                     (dest_ip, status)
                 })
             })

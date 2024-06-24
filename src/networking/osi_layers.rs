@@ -1,10 +1,5 @@
-use super::interface::Interface;
-use crate::{
-    errors::{ChannelError, ScannerError},
-    networking::arp::Arp,
-};
+use crate::errors::{ChannelError, ScannerError};
 use anyhow::Result;
-use netdev::get_default_gateway;
 use pnet::{
     datalink::{self, Channel, NetworkInterface},
     packet::{
@@ -19,9 +14,11 @@ use pnet::{
     util::MacAddr,
 };
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::IpAddr,
     time::{Duration, Instant},
 };
+
+use super::interface::Interface;
 
 const ETHERNET_BUFFER_SIZE: usize = 4096;
 const ETHERNET_HEADER_SIZE: usize = 14;
@@ -227,7 +224,7 @@ impl DatalinkLayer {
         ethernet_buffer[..(ETHERNET_HEADER_SIZE + payload.len())].to_vec()
     }
 
-    /// Sends a packet over a data link channel and waits 3 seconds for a response.
+    /// Sends a packet over a data link channel and waits `timeout` for a response.
     ///
     /// Processes the ethernet frames in the channel and matches them against the provided layer data.
     ///
@@ -250,7 +247,7 @@ impl DatalinkLayer {
         let src_mac = if dest_mac == MacAddr::zero() {
             MacAddr::zero()
         } else {
-            interface.mac.ok_or(ScannerError::CantFindMacAddress)?
+            interface.mac.ok_or(ScannerError::CantFindInterfaceMac)?
         };
 
         let ethernet_packet =
@@ -263,7 +260,7 @@ impl DatalinkLayer {
             .ok_or(ChannelError::SendError)??;
 
         let mut response_buffer = None;
-        
+
         while send_time.elapsed() < timeout {
             if let Ok(response) = receiver.next() {
                 if layers.match_layer(response) {
@@ -286,18 +283,17 @@ impl NetworkLayer {
     ///
     /// Returns the response and the round-trip time.
     pub fn send_and_receive(
-        src_ip: Ipv4Addr,
-        dest_ip: Ipv4Addr,
+        interface: Interface,
         packet: &[u8],
         layers: Layer,
         timeout: Duration,
     ) -> Result<(Option<Vec<u8>>, Duration)> {
-        let dest_mac = NetworkLayer::get_dest_mac_address(src_ip, dest_ip, timeout)?;
+        let dest_mac = interface.gateway.mac;
 
-        let interface = Interface::from_ip(src_ip).ok_or(ScannerError::CantFindInterface)?;
+        let iface = interface.convert_interface()?;
 
         let (response, rtt) = DatalinkLayer::send_and_receive(
-            interface,
+            iface,
             dest_mac,
             EtherTypes::Ipv4,
             packet,
@@ -307,73 +303,6 @@ impl NetworkLayer {
 
         Ok((response, rtt))
     }
-
-    /// Attempts to determine the MAC address of the given `dest_ip`.
-    ///
-    /// If `dest_ip` is local, the MAC address is set to zero or resolved using ARP.
-    ///
-    /// Otherwise, returns the MAC address of the default gateway.
-    pub fn get_dest_mac_address(
-        src_ip: Ipv4Addr,
-        dest_ip: Ipv4Addr,
-        timeout: Duration,
-    ) -> Result<MacAddr> {
-        if NetworkLayer::is_dest_ip_local(dest_ip) {
-            if NetworkLayer::is_dest_ip_loopback(src_ip, dest_ip) {
-                // Loopback address.
-                Ok(MacAddr::zero())
-            } else {
-                // Resolve MAC address in local network.
-                NetworkLayer::resolve_mac_address(src_ip, dest_ip, timeout)
-            }
-        } else {
-            // Mac address of the default gateway.
-            let default_gateway = get_default_gateway()
-                .ok()
-                .ok_or(ScannerError::CantFindRouterAddress)?;
-            let mac_addr = MacAddr::new(
-                default_gateway.mac_addr.0,
-                default_gateway.mac_addr.1,
-                default_gateway.mac_addr.2,
-                default_gateway.mac_addr.3,
-                default_gateway.mac_addr.4,
-                default_gateway.mac_addr.5,
-            );
-            Ok(mac_addr)
-        }
-    }
-
-    /// Attempts to resolve the MAC address of some IP address in the local network.
-    ///
-    /// Sends an ARP request to the `dest_ip` and waits for a response.
-    pub fn resolve_mac_address(
-        src_ip: Ipv4Addr,
-        dest_ip: Ipv4Addr,
-        timeout: Duration,
-    ) -> Result<MacAddr> {
-        Arp::send_request(src_ip, dest_ip, timeout)
-            .ok()
-            .and_then(|(mac, _)| mac)
-            .ok_or(ScannerError::NoArpResponse.into())
-    }
-
-    /// Check if `dest_ip` and `src_ip` are the same or if `dest_ip` is a loopback address.
-    pub fn is_dest_ip_loopback(src_ip: Ipv4Addr, dest_ip: Ipv4Addr) -> bool {
-        dest_ip == src_ip || dest_ip.is_loopback()
-    }
-
-    /// Determines if the destination IP address is local to the network.
-    pub fn is_dest_ip_local(dest_ip: Ipv4Addr) -> bool {
-        if dest_ip.is_loopback() {
-            return true;
-        }
-        datalink::interfaces().iter().any(|interface| {
-            interface
-                .ips
-                .iter()
-                .any(|ip_network| ip_network.contains(IpAddr::V4(dest_ip)))
-        })
-    }
 }
 
 #[cfg(test)]
@@ -381,22 +310,7 @@ mod tests {
     use super::*;
     use crate::networking::tcp::Tcp;
     use pnet::packet::tcp::TcpFlags;
-    use std::{os::windows::process::ExitStatusExt, process::Output};
-
-    fn mock_system_route(output: Output, route: &str) -> Result<Ipv4Addr> {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let lines = stdout.lines();
-        for line in lines {
-            if line.contains(route) {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() > 2 {
-                    let route_ip: Ipv4Addr = parts[2].parse()?;
-                    return Ok(route_ip);
-                }
-            }
-        }
-        Err(ScannerError::CantFindRouterAddress.into())
-    }
+    use std::net::Ipv4Addr;
 
     #[test]
     fn test_layers_match() {
@@ -448,77 +362,5 @@ mod tests {
         let ethernet_packet_2 =
             DatalinkLayer::build_ethernet_packet(src_mac, dest_mac, ethertype, &tcp_packet_2);
         assert!(!transport_layer.match_packet(&ethernet_packet_2));
-    }
-
-    #[test]
-    fn test_get_dest_mac_address() {
-        // Test with a local IP address.
-        let src_ip = Ipv4Addr::new(127, 0, 0, 1);
-        let dest_ip = Ipv4Addr::new(127, 0, 0, 1);
-        let timeout = Duration::from_secs(5);
-        let mac = NetworkLayer::get_dest_mac_address(src_ip, dest_ip, timeout);
-        assert!(mac.is_ok());
-        assert_eq!(mac.unwrap(), MacAddr::zero());
-
-        // Test with a non-local IP address.
-        let dest_ip_remote = Ipv4Addr::new(8, 8, 8, 8);
-        let timeout = Duration::from_secs(5);
-        let mac_remote = NetworkLayer::get_dest_mac_address(src_ip, dest_ip_remote, timeout);
-        assert!(mac_remote.is_ok());
-        assert_ne!(mac_remote.unwrap(), MacAddr::zero());
-    }
-
-    #[test]
-    fn test_system_route_windows() {
-        // Mock output for Windows format.
-        let mock_output = "\
-            ===========================================================================
-            Interface List
-             15...00 1c 42 2b 60 5a ......Intel(R) Ethernet Connection
-              1...........................Software Loopback Interface 1
-              ===========================================================================
-            IPv4 Route Table
-            ===========================================================================
-            Active Routes:
-            Network Destination        Netmask          Gateway       Interface  Metric
-                    0.0.0.0          0.0.0.0     192.168.1.1    192.168.1.100    25
-                    127.0.0.0        255.0.0.0      On-link        127.0.0.1    306
-                    127.0.0.1  255.255.255.255      On-link        127.0.0.1    306
-                    127.255.255.255  255.255.255.255      On-link        127.0.0.1    306
-            ===========================================================================
-            ";
-
-        // Simulate the command output.
-        let output = Output {
-            stdout: mock_output.as_bytes().to_vec(),
-            stderr: vec![],
-            status: std::process::ExitStatus::from_raw(0),
-        };
-
-        // Mock the system route function.
-        let route_ip = mock_system_route(output, "0.0.0.0").unwrap();
-        assert_eq!(route_ip, Ipv4Addr::new(192, 168, 1, 1));
-    }
-
-    #[test]
-    fn test_system_route_linux() {
-        // Mock output for Linux format.
-        let mock_output = "\
-            default via 192.168.1.1 dev eth0 proto static
-            192.168.1.0/24 dev eth0 proto kernel scope link src 192.168.1.100 metric 100
-            192.168.1.0/24 dev wlan0 proto kernel scope link src 192.168.1.101 metric 600
-            192.168.1.0/24 dev wlan0 proto static scope link metric 100
-            ";
-
-        // Simulate the command output.
-        let output = Output {
-            stdout: mock_output.as_bytes().to_vec(),
-            stderr: vec![],
-            status: std::process::ExitStatus::from_raw(0),
-        };
-
-        // Mock the system route function.
-        let route_ip = mock_system_route(output, "default").unwrap();
-        assert_eq!(route_ip, Ipv4Addr::new(192, 168, 1, 1));
     }
 }

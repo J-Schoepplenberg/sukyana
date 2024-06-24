@@ -1,4 +1,7 @@
-use super::osi_layers::{Layer, NetworkLayer, TransportLayer};
+use super::{
+    interface::Interface,
+    osi_layers::{Layer, NetworkLayer, TransportLayer},
+};
 use anyhow::Result;
 use pnet::packet::{
     self,
@@ -62,6 +65,7 @@ impl Tcp {
     ///
     /// The packet is handed over to the network layer.
     pub fn send_tcp_packet(
+        interface: Interface,
         src_ip: Ipv4Addr,
         src_port: u16,
         dest_ip: Ipv4Addr,
@@ -85,8 +89,7 @@ impl Tcp {
 
         let layer = Layer::Four(transport_layer);
 
-        let (response, rtt) =
-            NetworkLayer::send_and_receive(src_ip, dest_ip, &packet, layer, timeout)?;
+        let (response, rtt) = NetworkLayer::send_and_receive(interface, &packet, layer, timeout)?;
 
         Ok((response, rtt))
     }
@@ -141,11 +144,19 @@ mod tests {
         let dest_ip = Ipv4Addr::new(142, 251, 209, 131);
         let dest_port = 80;
 
+        let iface = Interface::new()?;
         let timeout = Duration::from_secs(5);
 
         // Send a SYN packet. Calls subsequently the network and data link layer.
-        let (packet, rtt) =
-            Tcp::send_tcp_packet(src_ip, src_port, dest_ip, dest_port, TcpFlags::SYN, timeout)?;
+        let (packet, _rtt) = Tcp::send_tcp_packet(
+            iface,
+            src_ip,
+            src_port,
+            dest_ip,
+            dest_port,
+            TcpFlags::SYN,
+            timeout,
+        )?;
 
         // Ensure we have received a response packet.
         assert!(packet.is_some());

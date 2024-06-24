@@ -2,8 +2,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ScannerError {
-    #[error("Cannot find a router address.")]
-    CantFindRouterAddress,
     #[error("Cannot find an interface.")]
     CantFindInterface,
     #[error("Cannot find a MAC address.")]
@@ -22,14 +20,18 @@ pub enum ScannerError {
     UnexpectedTcpFlags,
     #[error("Unexpected ICMP response.")]
     UnexpectedIcmpResponse,
-    #[error("Unexpected UDP response.")]
-    UnexpectedUdpResponse,
     #[error("Unexpected Protocol response.")]
     UnexpectedProtocolResponse,
     #[error("Could not write results to a file.")]
     CouldNotWriteResults,
-    #[error("Host did not respond to ARP request.")]
-    NoArpResponse,
+    #[error("Cannot find a gateway associated with the interface.")]
+    CantFindGateway,
+    #[error("Cannot find an IP address for the gateway.")]
+    CantFindGatewayIp,
+    #[error("Cannot find an IP address for the interface.")]
+    CantFindInterfaceIp,
+    #[error("Cannot find a MAC address for the interface.")]
+    CantFindInterfaceMac,
 }
 
 #[derive(Error, Debug)]

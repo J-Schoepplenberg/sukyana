@@ -1,4 +1,7 @@
-use super::osi_layers::{Layer, NetworkLayer, TransportLayer};
+use super::{
+    interface::Interface,
+    osi_layers::{Layer, NetworkLayer, TransportLayer},
+};
 use anyhow::Result;
 use pnet::packet::{
     icmp::{
@@ -70,6 +73,7 @@ impl Icmp {
     ///
     /// The packet is handed over to the transport layer.
     pub fn send_icmp_packet(
+        interface: Interface,
         src_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
         timeout: Duration,
@@ -90,8 +94,7 @@ impl Icmp {
 
         let layer = Layer::Four(transport_layer);
 
-        let (response, rtt) =
-            NetworkLayer::send_and_receive(src_ip, dest_ip, &packet, layer, timeout)?;
+        let (response, rtt) = NetworkLayer::send_and_receive(interface, &packet, layer, timeout)?;
 
         Ok((response, rtt))
     }

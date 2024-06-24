@@ -1,5 +1,3 @@
-use crate::errors::ScannerError;
-
 use super::{
     interface::Interface,
     osi_layers::{DatalinkLayer, Layer, NetworkLayer},
@@ -40,19 +38,14 @@ impl Arp {
     ///
     /// The ARP packet is handed over to the data link layer.
     pub fn send_request(
+        interface: Interface,
         src_ip: Ipv4Addr,
         dest_ip: Ipv4Addr,
         timeout: Duration,
     ) -> Result<(Option<MacAddr>, Duration)> {
-        let interface = match Interface::from_ip(src_ip) {
-            Some(interface) => interface,
-            None => return Err(ScannerError::CantFindInterface.into()),
-        };
+        let src_mac = interface.mac;
 
-        let src_mac = match interface.mac {
-            Some(mac) => mac,
-            None => return Err(ScannerError::CantFindMacAddress.into()),
-        };
+        let iface = interface.convert_interface()?;
 
         let arp_packet = Arp::build_arp_packet(src_mac, src_ip, dest_ip);
 
@@ -73,7 +66,7 @@ impl Arp {
         let layer = Layer::Three(network_layer);
 
         let (response, rtt) = DatalinkLayer::send_and_receive(
-            interface,
+            iface,
             MacAddr::broadcast(),
             ethernet_type,
             &arp_packet,
@@ -106,21 +99,24 @@ mod tests {
 
     #[test]
     fn test_send_request_and_get_mac() -> Result<()> {
-        // Local interface IP address.
+        // Get the default interface.
+        let iface = Interface::new()?;
+
+        // Local IP address.
         let src_ip = Ipv4Addr::new(192, 168, 178, 26);
 
-        // Router IP address.
-        let router_ip = Ipv4Addr::new(192, 168, 178, 1);
+        // Local IP address.
+        let router_ip = Ipv4Addr::new(192, 168, 178, 26);
 
         // Time to wait for a response.
         let timeout = Duration::from_secs(5);
 
         // Send an ARP request to the router. Parses the MAC address from the response.
-        let (response, _rtt) = Arp::send_request(src_ip, router_ip, timeout).unwrap();
+        let (response, _rtt) = Arp::send_request(iface, src_ip, router_ip, timeout).unwrap();
 
-        println!("RTT: {:?}", response);
         // Ensure we received a response.
         assert!(response.is_some());
+
         Ok(())
     }
 }

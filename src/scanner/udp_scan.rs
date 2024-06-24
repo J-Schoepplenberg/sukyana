@@ -1,5 +1,8 @@
 use super::scanner::ScanResult;
-use crate::{errors::ScannerError, networking::udp::Udp};
+use crate::{
+    errors::ScannerError,
+    networking::{interface::Interface, udp::Udp},
+};
 use anyhow::Result;
 use pnet::packet::{
     ethernet::EthernetPacket,
@@ -11,11 +14,12 @@ use pnet::packet::{
 use std::{net::IpAddr, time::Duration};
 
 /// Scans a host using UDP packets. Determines if a port is open, closed, or filtered.
-/// 
+///
 /// Most popular services run over TCP, but UDP is used for services like DNS, DHCP, and SNMP.
-/// 
+///
 /// Since UDP is connectionless, it's not as reliable as TCP to receive a response.
 pub fn udp_scan(
+    interface: Interface,
     src_ip: IpAddr,
     src_port: u16,
     dest_ip: IpAddr,
@@ -32,7 +36,8 @@ pub fn udp_scan(
         _ => Err(ScannerError::UnsupportedIpVersion)?,
     };
 
-    let (response, rtt) = Udp::send_udp_packet(ipv4_src, src_port, ipv4_dest, dest_port, timeout)?;
+    let (response, rtt) =
+        Udp::send_udp_packet(interface, ipv4_src, src_port, ipv4_dest, dest_port, timeout)?;
 
     // No response -> open or filtered.
     let packet = match response {

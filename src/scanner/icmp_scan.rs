@@ -1,5 +1,8 @@
 use super::scanner::ScanResult;
-use crate::{errors::ScannerError, networking::icmp::Icmp};
+use crate::{
+    errors::ScannerError,
+    networking::{icmp::Icmp, interface::Interface},
+};
 use anyhow::Result;
 use pnet::packet::{
     ethernet::EthernetPacket,
@@ -13,6 +16,7 @@ use std::{net::IpAddr, time::Duration};
 ///
 /// Determines if a host is up or down. Might not work behind a firewall.
 pub fn icmp_scan(
+    interface: Interface,
     src_ip: IpAddr,
     dest_ip: IpAddr,
     timeout: Duration,
@@ -27,7 +31,7 @@ pub fn icmp_scan(
         _ => Err(ScannerError::UnsupportedIpVersion)?,
     };
 
-    let (response, rtt) = Icmp::send_icmp_packet(ipv4_src, ipv4_dest, timeout)?;
+    let (response, rtt) = Icmp::send_icmp_packet(interface, ipv4_src, ipv4_dest, timeout)?;
 
     // No response -> down.
     let packet = match response {
@@ -52,7 +56,7 @@ pub fn icmp_scan(
         IcmpCodes::HostAdministrativelyProhibited,
         IcmpCodes::CommunicationAdministrativelyProhibited,
     ];
-    
+
     let icmp_type = icmp_packet.get_icmp_type();
     let icmp_code = icmp_packet.get_icmp_code();
 
