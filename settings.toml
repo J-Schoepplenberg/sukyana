@@ -21,6 +21,6 @@ port_numbers = ["22", "80", "443"]
 # Alternatively, you may also specify a subnet like: ip_addresses = ["192.168.178.0/24"].
 ip_addresses = ["192.168.178.1", "8.8.8.8"]
 
-# Add the duration for how long the data link layer channel will listen to responses.
+# Add the duration in seconds for how long the data link layer channel will listen to responses.
 # After the timeout has run up, the channel will terminate. 
 timeout = 1

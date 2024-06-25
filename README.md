@@ -41,19 +41,19 @@ A port scan can be stealthy or overt, detectable by the volume of packets sent, 
 
 
 
-| Method               | Details   |
-| :------------------- | :---------------------------------------------------------------------------------------------- |
-| TCP SYN Scan     | Sends TCP packets with the SYN flag set. Determines if a port is: open, closed or filtered. Does not complete the three-way handshake and does not need to tear down connections. The most common scan type due to its speed and stealthiness.|
-| TCP Connect Scan     | Establishes a full TCP connection using the TCP connect system call, completing the three-way handshake. If the handshake cannot be established, the port is considered as closed. Significantly more noisy and slower than a SYN scan. |
-| TCP ACK Scan     | Sends TCP packets with the ACK flag set. Determines if a port is: unfiltered or filtered. |
-| TCP FIN Scan     | Sends TCP packets with the FIN flag set. Determines if a port is: open\|filtered, closed or filtered. |
-| TCP XMAS Scan     | Sends TCP packets with FIN, PSH and URG flags set. Determines if a port is: open\|filtered, closed or filtered. |
-| TCP NULL Scan     | Sends TCP packets with no flags set. Determines if a port is: open\|filtered closed or filtered. |
-| TCP Window Scan     | Works the same as TCP ACK scans, but examines the window field in the TCP header of RST packets. Determines if a port is: open, closed or filtered. |
-| TCP Maimon Scan     | Sends TCP packets with FIN and ACK flags set. Determines if a port is: open\|filtered closed or filtered. |
-| UDP Scan     | Sends UDP packets. Determines if a port is: open, closed or filtered. Most popular services run over TCP, but UDP is used for services like DNS, DHCP, and SNMP. Since UDP is connectionless, it's not as reliable as TCP to receive a response. |
-| ICMP Scan     | Sends ICMP echo requests. Is also known as a ping scan. Determines if a host is: up or down. |
-| ARP Scan     | Sends ARP request packets. Determines the MAC address of hosts on the local network. |
+| Method                             | Details       | 
+| :--------------------------------- | :------------ |
+| TCP SYN Scan    | Sends TCP packets with the SYN flag set. Determines if a port is: open, closed or filtered. Does not complete the three-way handshake and does not need to tear down connections. The most common scan type due to its speed and stealthiness.|
+| TCP Connect Scan   | Establishes a full TCP connection using the TCP connect system call, completing the three-way handshake. If the handshake cannot be established, the port is considered as closed. Significantly more noisy and slower than a SYN scan. |
+| TCP ACK Scan   | Sends TCP packets with the ACK flag set. Determines if a port is: unfiltered or filtered. |
+| TCP FIN Scan  | Sends TCP packets with the FIN flag set. Determines if a port is: open\|filtered, closed or filtered. |
+| TCP XMAS Scan   | Sends TCP packets with FIN, PSH and URG flags set. Determines if a port is: open\|filtered, closed or filtered. |
+| TCP NULL Scan   | Sends TCP packets with no flags set. Determines if a port is: open\|filtered closed or filtered. |
+| TCP Window Scan  | Works the same as TCP ACK scans, but examines the window field in the TCP header of RST packets. Determines if a port is: open, closed or filtered. |
+| TCP Maimon Scan | Sends TCP packets with FIN and ACK flags set. Determines if a port is: open\|filtered closed or filtered. |
+| UDP Scan | Sends UDP packets. Determines if a port is: open, closed or filtered. Most popular services run over TCP, but UDP is used for services like DNS, DHCP, and SNMP. Since UDP is connectionless, it's not as reliable as TCP to receive a response. |
+| ICMP Scan | Sends ICMP echo requests. Is also known as a ping scan. Determines if a host is: up or down. |
+| ARP Scan | Sends ARP request packets. Determines the MAC address of hosts on the local network. |
 
 ## Flooding
 A flood is a type of denial-of-service (DoS) attack in which a large volume of data packets is rapidly sent to a target system in order to exhaust its resources, potentially rendering the system inaccessible to its intended users.
@@ -61,12 +61,12 @@ A flood is a type of denial-of-service (DoS) attack in which a large volume of d
 `Sukyana` uses the low-level networking library [libpnet](https://github.com/libpnet/libpnet "libpnet") to create and manipulate packets at will. Large amounts of TCP/UDP traffic can be generated and sent to a target system. However, any network with reasonable defensive security measures in place should be able to quickly block such traffic.
 
 
-| Method                              | Details   |
-| :-------------------------------------------------- | :----------------------------------------------------------- |
-| TCP SYN Flood     | Sends TCP packets with the SYN flag set, which initiates a connection to a socket by starting the three-way handshake without ever completing the connection. The target consumes resources waiting for half-open connections. The expected RFC 793 behavior is for the target to respond with a packet that has the SYN-ACK flag set. Because this attack does not require a full TCP connection to be established, it is easy to generate large volumes of packets. |
-| TCP ACK Flood     | Sends TCP packets with the ACK flag set. These packets are used to acknowledge receipt of packets, or to indicate that packets have been received in order. The target can search its half-open connections for a match, which may eventually exhaust it by keeping it too busy to process other packets. This attack also does not require a full TCP connection to be established, again making it easy to generate large volumes of packets. |
-| UDP Flood     | Sends UDP packets to a target at a high rate. The expected behavior is for the target to respond with ICMP destination unreachable packets after checking that no service listens at that port. The idea is that these packets consume a large amount of bandwidth that may prevent the target from providing other services. To avoid receiving ICMP packets back from the target, you can also spoof the IP address of the UDP packets sent. |
-| ICMP Flood     | Sends ICMP echo packets, also known as pings, to a target at a high rate. The target may become too busy responding to these echo requests, resulting in the target being unable to provide other services. |
+| Method     | Details   |
+| :--------- | :-------- |
+| TCP SYN Flood | Sends TCP packets with the SYN flag set, which initiates a connection to a socket by starting the three-way handshake without ever completing the connection. The target consumes resources waiting for half-open connections. The expected RFC 793 behavior is for the target to respond with a packet that has the SYN-ACK flag set. Because this attack does not require a full TCP connection to be established, it is easy to generate large volumes of packets. |
+| TCP ACK Flood  | Sends TCP packets with the ACK flag set. These packets are used to acknowledge receipt of packets, or to indicate that packets have been received in order. The target can search its half-open connections for a match, which may eventually exhaust it by keeping it too busy to process other packets. This attack also does not require a full TCP connection to be established, again making it easy to generate large volumes of packets. |
+| UDP Flod | Sends UDP packets to a target at a high rate. The expected behavior is for the target to respond with ICMP destination unreachable packets after checking that no service listens at that port. The idea is that these packets consume a large amount of bandwidth that may prevent the target from providing other services. To avoid receiving ICMP packets back from the target, you can also spoof the IP address of the UDP packets sent. |
+| ICMP Flood | Sends ICMP echo packets, also known as pings, to a target at a high rate. The target may become too busy responding to these echo requests, resulting in the target being unable to provide other services. |
 
 ### Reflection Attack
 With `Sukyana`, it is possible to set a false source IP address and source port for each of the packets it sends. This technique is also known as IP spoofing and can be used to perform a reflection attack. In this type of technique, request packets are sent to a third-party network with the source IP address spoofed to be that of a victim. The third-party network believes that the requests are legitimate and coming from the victim, which tricks it into sending its replies to the victim's IP address. This can result in the victim being flooded with response packets.
@@ -91,11 +91,11 @@ To use `Sukyana`, follow these steps:
 3. **Run the Application**
    - To execute the application, use the following command:
      ```sh
-     cargo run --release -- --config <PATH> [OPTIONS] [COMMAND]
+     cargo run --release -- --config <CONFIG> [OPTIONS] [COMMAND]
      ```
    - Alternatively, you can run the compiled executable:
      ```sh
-     .\sukyana.exe --config <PATH> [OPTIONS] [COMMAND]
+     .\sukyana.exe --config <CONFIG> [OPTIONS] [COMMAND]
      ```
 
 ### Config
@@ -129,45 +129,50 @@ ip_addresses = ["192.168.178.1", "8.8.8.8"]
 timeout = 1
 ```
 
-### Examples
+### Port Scan
 
-#### Port Scan
-Perform a TCP SYN port scan:
 ```sh
-.\sukyana.exe --config <PATH> scan --tcp-syn
+Usage: sukyana.exe --config <CONFIG> scan [OPTIONS]
+
+Options:
+      --tcp-syn      TCP SYN scan
+      --tcp-connect  TCP connect scan
+      --tcp-ack      TCP ACK scan
+      --tcp-fin      TCP FIN scan
+      --tcp-xmas     TCP XMAS scan
+      --tcp-null     TCP NULL scan
+      --tcp-window   TCP window scan
+      --tcp-maimon   TCP Maimon scan
+      --udp          UDP scan
+  -h, --help         Print help
 ```
 
-#### ARP Scan
-Perform an ARP scan:
+#### Options
+
 ```sh
-.\sukyana.exe --config <PATH> --arp
+Usage: sukyana.exe [OPTIONS] --config <CONFIG> [COMMAND]
+
+Commands:
+  scan  Scan ports on hosts
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+      --config <CONFIG>
+      --arp              ARP scan
+      --ping             ICMP scan
+  -h, --help             Print help
+  -V, --version          Print version
 ```
 
-#### ICMP Scan
-Perform an ICMP ping scan:
-```sh
-.\sukyana.exe --config <PATH> --ping
-```
-
-### Help
-Display general help:
-```sh
-.\sukyana.exe --help
-```
-Display help for the scan command:
-```sh
-.\sukyana.exe scan --help
-```
-
-Replace `<PATH>` with the actual path to your configuration file. The `[OPTIONS]` and `[COMMAND]` placeholders represent additional options and commands specific to your use case.
+Replace `<CONFIG>` with the actual path to your configuration file. The `[OPTIONS]` and `[COMMAND]` placeholders represent additional options and commands specific to your use case.
 
 ### Windows
 To compile `Sukyana` you need to fulfill the requirements that are introduced through `libpnet`. These are namely:
 - You must use a version of Rust which uses the MSVC toolchain
 - You must have WinPcap or npcap installed
 - You must place `Packet.lib` from the [WinPcap Developers pack](https://www.winpcap.org/devel.htm "WinPcap Developers pack") directly in the root of this repository
--- For x64 (64-bit) systems you find the file in `WpdPack/Lib/x64/Packet.lib`
--- For x86 (32-bit) systems you find the file in `WpdPack/Lib/Packet.lib`
+  - For x64 (64-bit) systems you find the file in `WpdPack/Lib/x64/Packet.lib`
+  - For x86 (32-bit) systems you find the file in `WpdPack/Lib/Packet.lib`
 
 ## Legal Disclaimer
 The code provided in this repository is for educational and research purposes only. `Sukyana` has been written solely to aid in the understanding of low-level networking and network security. It should only be used for legitimate purposes, such as testing the security of your own systems or systems that you have explicit permission to test from the owner. Make sure you have proper authorization before using `Sukyana` to scan or test any network, system, or device. Unauthorized use against any system or network is strictly prohibited and may be illegal. The author of `Sukyana` is not responsible or liable for any misuse. You acknowledge and agree that you are solely responsible for your use of the code in this repository. This disclaimer must be included in all copies or distributions of this repository, and by downloading or using `Sukyana` you agree to be bound by the above terms.

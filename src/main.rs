@@ -17,10 +17,10 @@ mod output;
 struct Cli {
     #[arg(long)]
     config: String,
-    /// Retrieve MAC addresses of hosts via ARP.
+    /// ARP scan.
     #[arg(long)]
     arp: bool,
-    /// Ping hosts with ICMP echo requests.
+    /// ICMP scan.
     #[arg(long)]
     ping: bool,
     /// Subcommands.
