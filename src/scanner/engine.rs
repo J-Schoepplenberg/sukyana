@@ -19,6 +19,7 @@ use std::{
     time::Duration,
 };
 
+#[derive(Debug)]
 pub enum ScanMethod {
     TcpSyn,
     TcpConnect,

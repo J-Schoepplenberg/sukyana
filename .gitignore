@@ -2,3 +2,4 @@ debug/
 target/
 Cargo.lock
 Packet.lib
+*_scan_results.csv

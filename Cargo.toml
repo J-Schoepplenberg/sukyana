@@ -2,7 +2,7 @@
 name = "sukyana"
 version = "1.0.0"
 authors = ["Jannis Schoepplenberg <jschoe@proton.me>"]
-description = "A high-performance, robust, low-level port scanner and flooder written in pure, safe Rust."
+description = "A low-level port scanner and flooder written in pure, safe Rust."
 keywords = ["networking", "cybersecurity", "port-scanner", "flooder", "network-security"]
 categories = ["cybersecurity", "networking", "port-scanning", "flooding", "network-security"]
 readme = "README.md"

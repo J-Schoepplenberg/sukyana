@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use env_logger::{Builder, WriteStyle};
-use input::{load_config, parse_ip_addresses};
+use input::{load_config, parse_ip_addresses, parse_port_numbers};
 use networking::interface::Interface;
 use output::{save_arp_results, save_icmp_results, save_port_scan_results};
 use scanner::engine::{ScanMethod, Scanner};
@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
 
     let timeout = std::time::Duration::from_secs(input.timeout);
 
-    let port_numbers = input.port_numbers;
+    let port_numbers = parse_port_numbers(input.port_numbers)?;
     let ip_addresses = parse_ip_addresses(input.ip_addresses)?;
 
     if let Some(command) = &args.command {

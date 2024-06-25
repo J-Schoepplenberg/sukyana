@@ -1,5 +1,5 @@
-src_ip = "192.168.179.26"
-src_port = 99
-port_numbers = [22, 80, 443]
+src_ip = "192.168.178.26"
+src_port = 12345
+port_numbers = ["22", "80", "443"]
 ip_addresses = ["192.168.178.1"]
 timeout = 1
