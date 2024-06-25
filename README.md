@@ -1,7 +1,7 @@
 # Sukyana
 A low-level port scanner and packet flooder written in pure, safe Rust.
 
-The code is based upon
+The code is based on
  
  > Gordon Fyodor Lyon, Nmap network scanning : official Nmap project guide to network discovery and security scanning. Sunnyvale, Ca: Insecure.com, Llc, 2008. Available: https://nmap.org/book/toc.html.
 
@@ -21,6 +21,7 @@ This allows `Sukyana` to go much further than simply using the standard Rust lib
   - [Port Scan](#port-scan)
   - [Options](#options)
   - [Windows](#windows)
+- [Roadmap](#roadmap)
 - [Legal Disclaimer](#legal-disclaimer)
 
 ## Networking Basics
@@ -43,9 +44,7 @@ A port scan is a process of sending packets to a range of sockets. This is not a
 
 It uses a combination of techniques to determine the state of ports on a target system. Services or applications that are available for networking require open ports to communicate. Common services have assigned port numbers, but can run on completely arbitrary ports. There are up to 65535 possible TCP/UDP ports that can be scanned by sending packets as probes and observing the responses to determine the status of ports. 
 
-A port scan can be stealthy or overt, detectable by the volume of packets sent, unusual flags set in packet headers, or event logging on the target system.
-
-
+A port scan can be stealthy or overt, detectable by the volume of packets sent, unusual flags set in packet headers, or event logging on the target system. `Sukyana` shuffles the given IP addresses and ports to avoid scanning in order. In addition, many different scanning methods are implemented, providing a variety of techniques.
 
 | Method                             | Details       | 
 | :--------------------------------- | :------------ |
@@ -65,7 +64,6 @@ A port scan can be stealthy or overt, detectable by the volume of packets sent, 
 A flood is a type of denial-of-service (DoS) attack in which a large volume of data packets is rapidly sent to a target system in order to exhaust its resources, potentially rendering the system inaccessible to its intended users.
 
 `Sukyana` uses the low-level networking library [libpnet](https://github.com/libpnet/libpnet "libpnet") to create and manipulate packets at will. Large amounts of TCP/UDP traffic can be generated and sent to a target system. However, any network with reasonable defensive security measures in place should be able to quickly block such traffic.
-
 
 | Method     | Details   |
 | :--------- | :-------- |
@@ -171,6 +169,12 @@ To compile `Sukyana` you need to fulfill the requirements that are introduced th
 - You must place `Packet.lib` from the [WinPcap Developers pack](https://www.winpcap.org/devel.htm "WinPcap Developers pack") directly in the root of this repository
   - For x64 (64-bit) systems you find the file in `WpdPack/Lib/x64/Packet.lib`
   - For x86 (32-bit) systems you find the file in `WpdPack/Lib/Packet.lib`
+
+## Roadmap
+- [ ] Automatic remote detection of operating systems and services.
+- [ ] Default scanning of top 1000 most common ports.
+- [ ] Ensure complete cross-platform support.
+- [ ] Add more DoS attack methods.
 
 ## Legal Disclaimer
 The code provided in this repository is for educational and research purposes only. `Sukyana` has been written solely to aid in the understanding of low-level networking and network security. It should only be used for legitimate purposes, such as testing the security of your own systems or systems that you have explicit permission to test from the owner. Make sure you have proper authorization before using `Sukyana` to scan or test any network, system, or device. Unauthorized use against any system or network is strictly prohibited and may be illegal. The author of `Sukyana` is not responsible or liable for any misuse. You acknowledge and agree that you are solely responsible for your use of the code in this repository. This disclaimer must be included in all copies or distributions of this repository, and by downloading or using `Sukyana` you agree to be bound by the above terms.

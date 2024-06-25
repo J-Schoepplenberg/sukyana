@@ -2,15 +2,16 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use env_logger::{Builder, WriteStyle};
 use input::{load_config, parse_ip_addresses, parse_port_numbers};
+use log::{error, info};
 use networking::interface::Interface;
 use output::{save_arp_results, save_icmp_results, save_port_scan_results};
+use rand::seq::SliceRandom;
 use scanner::engine::{ScanMethod, Scanner};
 mod errors;
-mod networking;
-mod scanner;
-use log::{error, info};
 mod input;
+mod networking;
 mod output;
+mod scanner;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -79,8 +80,13 @@ async fn main() -> Result<()> {
 
     let timeout = std::time::Duration::from_secs(input.timeout);
 
-    let port_numbers = parse_port_numbers(input.port_numbers)?;
-    let ip_addresses = parse_ip_addresses(input.ip_addresses)?;
+    let mut rng = rand::thread_rng();
+
+    let mut ip_addresses = parse_ip_addresses(input.ip_addresses)?;
+    let mut port_numbers = parse_port_numbers(input.port_numbers)?;
+
+    port_numbers.shuffle(&mut rng);
+    ip_addresses.shuffle(&mut rng);
 
     if let Some(command) = &args.command {
         match command {
