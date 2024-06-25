@@ -9,15 +9,6 @@ pub struct SocketIterator<'a> {
 
 impl<'a> SocketIterator<'a> {
     /// Creates a new `SocketIterator` from slices of IP addresses and ports.
-    ///
-    /// # Arguments
-    ///
-    /// * `ips` - A slice of IP addresses.
-    /// * `ports` - A slice of ports.
-    ///
-    /// # Returns
-    ///
-    /// A new `SocketIterator` instance.
     pub fn new(ip_addresses: &'a [IpAddr], port_numbers: &'a [u16]) -> Self {
         Self {
             socket_iterator: iproduct!(ip_addresses.iter(), port_numbers.iter()),
@@ -29,10 +20,6 @@ impl<'a> Iterator for SocketIterator<'a> {
     type Item = SocketAddr;
 
     /// Advances the iterator and returns the next `SocketAddr` combination.
-    ///
-    /// # Returns
-    ///
-    /// An `Option` containing the next `SocketAddr` if available, or `None` if the iterator is exhausted.
     fn next(&mut self) -> Option<Self::Item> {
         self.socket_iterator
             .next()

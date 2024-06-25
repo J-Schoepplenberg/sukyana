@@ -19,8 +19,18 @@ port_numbers = ["22", "80", "443"]
 # Packets will be sent to a socket addressable by that IP address.
 # You can specifyx single IP addresses in a list.
 # Alternatively, you may also specify a subnet like: ip_addresses = ["192.168.178.0/24"].
-ip_addresses = ["192.168.178.1", "8.8.8.8"]
+ip_addresses = ["192.168.178.1"]
 
 # Add the duration in seconds for how long the data link layer channel will listen to responses.
 # After the timeout has run up, the channel will terminate. 
 timeout = 1
+
+# Add the number of packets that will be sent in a flooding attack to each socket.
+# Use this setting very carefully as it may lead to a denial of service.
+# Do not use this setting to attack systems that you do not own or have permission to flood.
+number_of_packets = 10
+
+# Add if the source port in flooding attacks should be randomized.
+# This may prevent filtering of packet retransmissions by the target.
+# Retransmissions are marked if the packet is identical to previous packets.
+should_randomize_ports = false

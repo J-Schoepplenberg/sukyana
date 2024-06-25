@@ -1,6 +1,6 @@
 use super::tcp_scan::tcp_syn_scan;
 use crate::{
-    networking::{interface::Interface, socket_iterator},
+    networking::{interface::Interface, socket_iterator::SocketIterator},
     scanner::{
         arp_scan::arp_scan,
         icmp_scan::icmp_scan,
@@ -46,6 +46,9 @@ pub enum ScanResult {
 pub struct Scanner;
 
 impl Scanner {
+    /// Scans the given IP addresses and port numbers with the specified scan method.
+    ///
+    /// Returns IP addresses, scan results, and round-trip times of hosts that responded.
     pub async fn scan(
         interface: Interface,
         method: ScanMethod,
@@ -55,7 +58,7 @@ impl Scanner {
         port_numbers: &[u16],
         timeout: Duration,
     ) -> Vec<(SocketAddr, ScanResult, Duration)> {
-        let sockets = socket_iterator::SocketIterator::new(ip_addresses, port_numbers);
+        let sockets = SocketIterator::new(ip_addresses, port_numbers);
         let scan_method = match method {
             ScanMethod::TcpSyn => tcp_syn_scan,
             ScanMethod::TcpConnect => tcp_connect_scan,
@@ -116,6 +119,9 @@ impl Scanner {
         scanned_sockets
     }
 
+    /// Sends ICMP echo requests to the given IP addresses.
+    ///
+    /// Returns IP addresses, scan results, and round-trip times of hosts that responded.
     pub async fn ping(
         interface: Interface,
         src_ip: IpAddr,
@@ -156,10 +162,7 @@ impl Scanner {
             }
         }
 
-        info!(
-            "{} hosts answered to your ping with an ICMP response.",
-            responses
-        );
+        info!("{} hosts have been sent an ICMP echo request.", responses);
 
         info!(
             "{} of {} IP addresses unreachable.",

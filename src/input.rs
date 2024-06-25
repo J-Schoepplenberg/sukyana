@@ -10,6 +10,8 @@ pub struct Input {
     pub port_numbers: Vec<String>,
     pub ip_addresses: Vec<String>,
     pub timeout: u64,
+    pub number_of_packets: usize,
+    pub should_randomize_ports: bool,
 }
 
 pub fn load_config(path: &str) -> Result<Input> {

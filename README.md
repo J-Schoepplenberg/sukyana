@@ -7,9 +7,9 @@ The code is based on
 
 The logic for interpreting host responses to probes has been implemented according to the [nmap documentation](https://nmap.org/book/scan-methods.html).
 
-`Sukyana` processes raw packets, which means it is responsible for encapsulating layers, stripping headers, and explicitly analyzing response payloads, which is usually done automatically by the TCP/IP stack. As a result, Sukyana requires root privileges to run.
+`Sukyana` processes raw packets, which means it is responsible for encapsulating layers, stripping headers, and explicitly analyzing response payloads, which is usually done automatically by the TCP/IP stack. As a result, `Sukyana` requires root privileges to run.
 
-This allows `Sukyana` to go much further than simply using the standard Rust library `std::net::TcpStream`, which provides a TCP connect system call via `TcpStream::connect()`, where the operating system automatically handles the connection to a remote target. TCP connect gives much less control than raw packets and is simply less efficient. The system call completes a full TCP connection, requires multiple packets to be exchanged, and makes it more likely that the connection will be logged by the target.
+This allows us to go much further than simply using the standard Rust library `std::net::TcpStream`, which provides a TCP connect system call via `TcpStream::connect()`, where the operating system automatically handles the connection to a remote target. TCP connect gives much less control than raw packets and is simply less efficient. The system call completes a full TCP connection, requires multiple packets to be exchanged, and makes it more likely that the connection will be logged by the target.
 
 ## Table of Contents  
 - [Networking Basics](#networking-basics) 
@@ -18,7 +18,8 @@ This allows `Sukyana` to go much further than simply using the standard Rust lib
   - [Reflection Attack](#reflection-attack)
 - [Usage](#usage)
   - [Config](#config)
-  - [Port Scan](#port-scan)
+  - [Scan](#scan)
+  - [Flood](#flood)
   - [Options](#options)
   - [Windows](#windows)
 - [Roadmap](#roadmap)
@@ -49,7 +50,7 @@ A port scan can be stealthy or overt, detectable by the volume of packets sent, 
 | Method                             | Details       | 
 | :--------------------------------- | :------------ |
 | TCP SYN Scan    | Sends TCP packets with the SYN flag set. Determines if a port is: open, closed or filtered. Does not complete the three-way handshake and does not need to tear down connections. The most common scan type due to its speed and stealthiness.|
-| TCP Connect Scan   | Establishes a full TCP connection using the TCP connect system call, completing the three-way handshake. If the handshake cannot be established, the port is considered as closed. Significantly more noisy and slower than a SYN scan. |
+| TCP Connect Scan   | Establishes a full TCP connection using the TCP connect system call, completing the three-way handshake. If the handshake cannot be established, the port is considered as closed. Significantly more noisy and and less efficient than a TCP SYN scan. |
 | TCP ACK Scan   | Sends TCP packets with the ACK flag set. Determines if a port is: unfiltered or filtered. |
 | TCP FIN Scan  | Sends TCP packets with the FIN flag set. Determines if a port is: open\|filtered, closed or filtered. |
 | TCP XMAS Scan   | Sends TCP packets with FIN, PSH and URG flags set. Determines if a port is: open\|filtered, closed or filtered. |
@@ -67,13 +68,12 @@ A flood is a type of denial-of-service (DoS) attack in which a large volume of d
 
 | Method     | Details   |
 | :--------- | :-------- |
-| TCP SYN Flood | Sends TCP packets with the SYN flag set, which initiates a connection to a socket by starting the three-way handshake without ever completing the connection. The target consumes resources waiting for half-open connections. The expected RFC 793 behavior is for the target to respond with a packet that has the SYN-ACK flag set. Because this attack does not require a full TCP connection to be established, it is easy to generate large volumes of packets. |
-| TCP ACK Flood  | Sends TCP packets with the ACK flag set. These packets are used to acknowledge receipt of packets, or to indicate that packets have been received in order. The target can search its half-open connections for a match, which may eventually exhaust it by keeping it too busy to process other packets. This attack also does not require a full TCP connection to be established, again making it easy to generate large volumes of packets. |
+| TCP Flood | Sends TCP packets to a target at a high rate. You may choose which TCP flags you want to set. TCP SYN initiates a connection to a socket by starting the three-way handshake without ever completing the connection. The target consumes resources waiting for half-open connections. TCP ACK prompts the target to earch its half-open connections for a match, which may eventually exhaust it by keeping it too busy to process other packets. Other flags may also be set at your leasure. |
 | UDP Flod | Sends UDP packets to a target at a high rate. The expected behavior is for the target to respond with ICMP destination unreachable packets after checking that no service listens at that port. The idea is that these packets consume a large amount of bandwidth that may prevent the target from providing other services. To avoid receiving ICMP packets back from the target, you can also spoof the IP address of the UDP packets sent. |
 | ICMP Flood | Sends ICMP echo packets, also known as pings, to a target at a high rate. The target may become too busy responding to these echo requests, resulting in the target being unable to provide other services. |
 
 ### Reflection Attack
-With `Sukyana`, it is possible to set a false source IP address and source port for each of the packets it sends. This technique is also known as IP spoofing and can be used to perform a reflection attack. In this type of technique, request packets are sent to a third-party network with the source IP address spoofed to be that of a victim. The third-party network believes that the requests are legitimate and coming from the victim, which tricks it into sending its replies to the victim's IP address. This can result in the victim being flooded with response packets.
+You can set a false source IP address and source port for each of the packets sent. This technique is also known as IP spoofing and can be used to perform a reflection attack. In this type of technique, request packets are sent to a third-party network with the source IP address spoofed to be that of a victim. The third-party network believes that the requests are legitimate and coming from the victim, which tricks it into sending its replies to the victim's IP address. This can result in the victim being flooded with response packets.
 
 ## Usage
 
@@ -118,14 +118,24 @@ port_numbers = ["22", "80", "443"]
 # Packets will be sent to a socket addressable by that IP address.
 # You can specifyx single IP addresses in a list.
 # Alternatively, you may also specify a subnet like: ip_addresses = ["192.168.178.0/24"].
-ip_addresses = ["192.168.178.1", "8.8.8.8"]
+ip_addresses = ["192.168.178.1"]
 
-# Add the duration for how long the data link layer channel will listen to responses.
+# Add the duration in seconds for how long the data link layer channel will listen to responses.
 # After the timeout has run up, the channel will terminate. 
 timeout = 1
+
+# Add the number of packets that will be sent in a flooding attack to each socket.
+# Use this setting very carefully as it may lead to a denial of service.
+# Do not use this setting to attack systems that you do not own or have permission to flood.
+number_of_packets = 10
+
+# Add if the source port in flooding attacks should be randomized.
+# This may prevent filtering of packet retransmissions by the target.
+# Retransmissions are marked if the packet is identical to previous packets.
+should_randomize_ports = false
 ```
 
-### Port Scan
+### Scan
 
 ```sh
 Usage: sukyana.exe --config <CONFIG> scan [OPTIONS]
@@ -143,14 +153,27 @@ Options:
   -h, --help         Print help
 ```
 
+### Flood
+
+```sh
+Usage: sukyana.exe --config <CONFIG> flood [OPTIONS]
+
+Options:
+      --tcp   TCP flood
+      --udp   UDP flood
+      --icmp  ICMP flood
+  -h, --help  Print help
+```
+
 ### Options
 
 ```sh
 Usage: sukyana.exe [OPTIONS] --config <CONFIG> [COMMAND]
 
 Commands:
-  scan  Scan ports on hosts
-  help  Print this message or the help of the given subcommand(s)
+  scan   Scan ports on hosts
+  flood  Flood hosts
+  help   Print this message or the help of the given subcommand(s)
 
 Options:
       --config <CONFIG>

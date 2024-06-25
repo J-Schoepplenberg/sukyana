@@ -1,3 +1,4 @@
+use super::interface::Interface;
 use crate::errors::{ChannelError, ScannerError};
 use anyhow::Result;
 use pnet::{
@@ -17,8 +18,6 @@ use std::{
     net::IpAddr,
     time::{Duration, Instant},
 };
-
-use super::interface::Interface;
 
 const ETHERNET_BUFFER_SIZE: usize = 4096;
 const ETHERNET_HEADER_SIZE: usize = 14;
@@ -225,6 +224,22 @@ impl DatalinkLayer {
         ethernet_buffer[..(ETHERNET_HEADER_SIZE + payload.len())].to_vec()
     }
 
+    /// Mutates an Ethernet packet in-place.
+    pub fn mutate_ethernet_packet(
+        src_mac: MacAddr,
+        dest_mac: MacAddr,
+        ethertype: EtherType,
+        payload: &[u8],
+        packet: &mut [u8],
+    ) {
+        let mut ethernet_packet = MutableEthernetPacket::new(packet).unwrap();
+
+        ethernet_packet.set_source(src_mac);
+        ethernet_packet.set_destination(dest_mac);
+        ethernet_packet.set_ethertype(ethertype);
+        ethernet_packet.set_payload(payload);
+    }
+
     /// Sends a packet over a data link channel and waits `timeout` for a response.
     ///
     /// Processes the ethernet frames in the channel and matches them against the provided layer data.
@@ -274,6 +289,44 @@ impl DatalinkLayer {
         let rtt = send_time.elapsed();
 
         Ok((response_buffer, rtt))
+    }
+
+    /// Sends a packet over a data link channel.
+    ///
+    /// Does not wait or listen for a response.
+    pub fn send_flood(
+        interface: NetworkInterface,
+        payload: &[u8],
+        number_of_packets: usize,
+        packet_size: usize,
+        dest_mac: MacAddr,
+        ethertype: EtherType,
+    ) -> Result<()> {
+        let channel = datalink::channel(&interface, Default::default())?;
+
+        let (mut sender, mut _receiver) = match channel {
+            Channel::Ethernet(tx, rx) => (tx, rx),
+            _ => return Err(ChannelError::UnexpectedChannelType.into()),
+        };
+
+        let src_mac = interface.mac.ok_or(ScannerError::CantFindInterfaceMac)?;
+
+        let mut build_packet = |packet: &mut [u8]| {
+            Self::mutate_ethernet_packet(src_mac, dest_mac, ethertype, payload, packet);
+        };
+
+        if sender
+            .build_and_send(
+                number_of_packets,
+                ETHERNET_HEADER_SIZE + packet_size,
+                &mut build_packet,
+            )
+            .is_none()
+        {
+            return Err(ChannelError::SendError.into());
+        }
+
+        Ok(())
     }
 }
 

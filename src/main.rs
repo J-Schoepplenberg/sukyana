@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use env_logger::{Builder, WriteStyle};
+use flooder::engine::{FloodMethod, Flooder};
 use input::{load_config, parse_ip_addresses, parse_port_numbers};
 use log::{error, info};
 use networking::interface::Interface;
@@ -8,6 +9,7 @@ use output::{save_arp_results, save_icmp_results, save_port_scan_results};
 use rand::seq::SliceRandom;
 use scanner::engine::{ScanMethod, Scanner};
 mod errors;
+mod flooder;
 mod input;
 mod networking;
 mod output;
@@ -60,6 +62,18 @@ enum Commands {
         /// UDP scan.
         #[arg(long)]
         udp: bool,
+    },
+    /// Flood hosts.
+    Flood {
+        /// TCP flood.
+        #[arg(long)]
+        tcp: bool,
+        /// UDP flood.
+        #[arg(long)]
+        udp: bool,
+        /// ICMP flood.
+        #[arg(long)]
+        icmp: bool,
     },
 }
 
@@ -128,6 +142,29 @@ async fn main() -> Result<()> {
                             Ok(path) => info!("Port scan results saved to: {}.", path),
                             Err(e) => error!("Failed to save port scan results: {}", e),
                         }
+                    }
+                }
+            }
+            Commands::Flood { tcp, udp, icmp } => {
+                let flood_methods = vec![
+                    (*tcp, FloodMethod::Tcp),
+                    (*udp, FloodMethod::Udp),
+                    (*icmp, FloodMethod::Icmp),
+                ];
+
+                for (enabled, method) in flood_methods {
+                    if enabled {
+                        Flooder::flood(
+                            interface,
+                            method,
+                            src_ip,
+                            src_port,
+                            &ip_addresses,
+                            &port_numbers,
+                            input.number_of_packets,
+                            input.should_randomize_ports,
+                        )
+                        .await?;
                     }
                 }
             }
