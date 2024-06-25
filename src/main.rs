@@ -82,11 +82,10 @@ async fn main() -> Result<()> {
 
     let mut rng = rand::thread_rng();
 
-    let mut ip_addresses = parse_ip_addresses(input.ip_addresses)?;
+    let ip_addresses = parse_ip_addresses(input.ip_addresses)?;
     let mut port_numbers = parse_port_numbers(input.port_numbers)?;
 
     port_numbers.shuffle(&mut rng);
-    ip_addresses.shuffle(&mut rng);
 
     if let Some(command) = &args.command {
         match command {

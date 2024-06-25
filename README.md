@@ -44,7 +44,7 @@ A port scan is a process of sending packets to a range of sockets. This is not a
 
 It uses a combination of techniques to determine the state of ports on a target system. Services or applications that are available for networking require open ports to communicate. Common services have assigned port numbers, but can run on completely arbitrary ports. There are up to 65535 possible TCP/UDP ports that can be scanned by sending packets as probes and observing the responses to determine the status of ports. 
 
-A port scan can be stealthy or overt, detectable by the volume of packets sent, unusual flags set in packet headers, or event logging on the target system. `Sukyana` shuffles the given IP addresses and ports to avoid scanning in order. In addition, many different scanning methods are implemented, providing a variety of techniques.
+A port scan can be stealthy or overt, detectable by the volume of packets sent, unusual flags set in packet headers, or event logging on the target system. `Sukyana` shuffles the given ports to avoid scanning in order. In addition, many different scanning methods are implemented, providing a variety of techniques.
 
 | Method                             | Details       | 
 | :--------------------------------- | :------------ |
