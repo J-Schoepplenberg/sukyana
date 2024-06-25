@@ -1,6 +1,12 @@
 # Sukyana
 A low-level port scanner and packet flooder written in pure, safe Rust.
 
+The code is based upon
+ 
+ > Gordon Fyodor Lyon, Nmap network scanning : official Nmap project guide to network discovery and security scanning. Sunnyvale, Ca: Insecure.com, Llc, 2008. Available: https://nmap.org/book/toc.html.
+
+The logic for interpreting host responses to probes has been implemented according to the [nmap documentation](https://nmap.org/book/scan-methods.html).
+
 `Sukyana` processes raw packets, which means it is responsible for encapsulating layers, stripping headers, and explicitly analyzing response payloads, which is usually done automatically by the TCP/IP stack. As a result, Sukyana requires root privileges to run.
 
 This allows `Sukyana` to go much further than simply using the standard Rust library `std::net::TcpStream`, which provides a TCP connect system call via `TcpStream::connect()`, where the operating system automatically handles the connection to a remote target. TCP connect gives much less control than raw packets and is simply less efficient. The system call completes a full TCP connection, requires multiple packets to be exchanged, and makes it more likely that the connection will be logged by the target.
@@ -12,8 +18,8 @@ This allows `Sukyana` to go much further than simply using the standard Rust lib
   - [Reflection Attack](#reflection-attack)
 - [Usage](#usage)
   - [Config](#config)
-  - [Examples](#examples)
-  - [Help](#help)
+  - [Port Scan](#port-scan)
+  - [Options](#options)
   - [Windows](#windows)
 - [Legal Disclaimer](#legal-disclaimer)
 
@@ -75,28 +81,20 @@ With `Sukyana`, it is possible to set a false source IP address and source port 
 
 To use `Sukyana`, follow these steps:
 
-1. **Download the Repository**
-   - Clone the repository using:
-     ```sh
-     git clone https://github.com/yourusername/sukyana.git
-     ```
-   - Navigate to the project directory:
-     ```sh
-     cd sukyana
-     ```
+1. **Download the repository.**
+2. **Obtain root or administrative privileges.**
+3. **Run the application.**
+    - You either compile the application and run the binary: 
 
-2. **Obtain Root or Administrative Privileges**
-   - Ensure you have the necessary permissions to run the tool with administrative rights.
+      ```sh 
+      cargo run --release -- --config <CONFIG> [OPTIONS] [COMMAND]
+      ```
+   - Or you run the compiled application binary:
 
-3. **Run the Application**
-   - To execute the application, use the following command:
-     ```sh
-     cargo run --release -- --config <CONFIG> [OPTIONS] [COMMAND]
-     ```
-   - Alternatively, you can run the compiled executable:
-     ```sh
-     .\sukyana.exe --config <CONFIG> [OPTIONS] [COMMAND]
-     ```
+      ```sh 
+      .\sukyana.exe --config <CONFIG> [OPTIONS] [COMMAND]
+      ```
+
 
 ### Config
 You can specify variables in a `.toml` file, which is loaded via `--config <PATH>`:
@@ -147,7 +145,7 @@ Options:
   -h, --help         Print help
 ```
 
-#### Options
+### Options
 
 ```sh
 Usage: sukyana.exe [OPTIONS] --config <CONFIG> [COMMAND]
