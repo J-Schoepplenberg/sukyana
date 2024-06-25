@@ -11,6 +11,7 @@ This allows `Sukyana` to go much further than simply using the standard Rust lib
 - [Flooding](#flooding)
   - [Reflection Attack](#reflection-attack)
 - [Usage](#usage)
+  - [Config](#config)
   - [Examples](#examples)
   - [Help](#help)
   - [Windows](#windows)
@@ -96,6 +97,37 @@ To use `Sukyana`, follow these steps:
      ```sh
      .\sukyana.exe --config <PATH> [OPTIONS] [COMMAND]
      ```
+
+### Config
+You can specify variables in a `.toml` file, which is loaded via `--config <PATH>`:
+```toml
+# settings.toml
+
+# Add the IP address that is set as the sender of packets.
+# If you use a false IP address you effecively spoof the IP address of packets.
+# However, in that case you may not receive responses anymore.
+src_ip = "192.168.178.26"
+
+# Add the source port of packets.
+# Responses will be sent to src_ip:src_port.
+src_port = 12345
+
+# Add the target port of packets.
+# Packets will be sent to a socket listening to that port.
+# You can specify single ports in a list.
+# Alternatively, you may also specify a range like: port_numbers = ["1-1000"].
+port_numbers = ["22", "80", "443"]
+
+# Add the target IP addresses of packets.
+# Packets will be sent to a socket addressable by that IP address.
+# You can specifyx single IP addresses in a list.
+# Alternatively, you may also specify a subnet like: ip_addresses = ["192.168.178.0/24"].
+ip_addresses = ["192.168.178.1", "8.8.8.8"]
+
+# Add the duration for how long the data link layer channel will listen to responses.
+# After the timeout has run up, the channel will terminate. 
+timeout = 1
+```
 
 ### Examples
 
