@@ -45,7 +45,7 @@ A port scan is a process of sending packets to a range of sockets. This is not a
 
 It uses a combination of techniques to determine the state of ports on a target system. Services or applications that are available for networking require open ports to communicate. Common services have assigned port numbers, but can run on completely arbitrary ports. There are up to 65535 possible TCP/UDP ports that can be scanned by sending packets as probes and observing the responses to determine the status of ports. 
 
-A port scan can be stealthy or overt, detectable by the volume of packets sent, unusual flags set in packet headers, or event logging on the target system. `Sukyana` shuffles the given ports to avoid scanning in order. In addition, many different scanning methods are implemented, providing a variety of techniques.
+A port scan can be stealthy or overt, detectable by the volume of packets sent, unusual flags set in packet headers, or event logging on the target system. `Sukyana` shuffles the given ports to avoid scanning in order. In addition, many different scanning methods are implemented, providing a variety of techniques. The purpose and expected behavior of each scanning method according to standards such as RFC 793 has been commented in the source code.
 
 | Method                             | Details       | 
 | :--------------------------------- | :------------ |
@@ -55,7 +55,7 @@ A port scan can be stealthy or overt, detectable by the volume of packets sent, 
 | TCP FIN Scan  | Sends TCP packets with the FIN flag set. Determines if a port is: open\|filtered, closed or filtered. |
 | TCP XMAS Scan   | Sends TCP packets with FIN, PSH and URG flags set. Determines if a port is: open\|filtered, closed or filtered. |
 | TCP NULL Scan   | Sends TCP packets with no flags set. Determines if a port is: open\|filtered closed or filtered. |
-| TCP Window Scan  | Works the same as TCP ACK scans, but examines the window field in the TCP header of RST packets. Determines if a port is: open, closed or filtered. |
+| TCP Window Scan  | Works the same as TCP ACK scans, but examines the window field in the TCP header of RST flag packets. Determines if a port is: open, closed or filtered. |
 | TCP Maimon Scan | Sends TCP packets with FIN and ACK flags set. Determines if a port is: open\|filtered, closed or filtered. |
 | UDP Scan | Sends UDP packets. Determines if a port is: open, closed or filtered. Most popular services run over TCP, but UDP is used for services like DNS, DHCP, and SNMP. Since UDP is connectionless, it's not as reliable as TCP to receive a response. |
 | ICMP Scan | Sends ICMP echo requests. Is also known as a ping scan. Determines if a host is: up or down. |

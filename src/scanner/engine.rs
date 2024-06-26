@@ -59,6 +59,7 @@ impl Scanner {
         timeout: Duration,
     ) -> Vec<(SocketAddr, ScanResult, Duration)> {
         let sockets = SocketIterator::new(ip_addresses, port_numbers);
+
         let scan_method = match method {
             ScanMethod::TcpSyn => tcp_syn_scan,
             ScanMethod::TcpConnect => tcp_connect_scan,
@@ -70,8 +71,10 @@ impl Scanner {
             ScanMethod::TcpMaimon => tcp_maimon_scan,
             ScanMethod::Udp => udp_scan,
         };
+
         let mut handles = Vec::new();
         let mut total_sockets = 0;
+
         for socket in sockets {
             let handle = tokio::spawn(async move {
                 let status = tokio::task::spawn_blocking(move || {
@@ -91,6 +94,7 @@ impl Scanner {
             handles.push(handle);
             total_sockets += 1;
         }
+
         let results = join_all(handles).await;
 
         let mut scanned_sockets = Vec::new();
