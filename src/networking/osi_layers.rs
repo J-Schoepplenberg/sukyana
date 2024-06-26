@@ -331,9 +331,9 @@ impl DatalinkLayer {
 }
 
 impl NetworkLayer {
-    /// Determines the MAC address of `dest_ip` and which interface to use.
-    ///
-    /// The packet is handed over to the data link layer.
+    /// Hands over the packet to the data link layer.
+    /// 
+    /// Converts the interface to a `pnet::datalink::NetworkInterface`, which will be consumed by the data link layer.
     ///
     /// Returns the response and the round-trip time.
     pub fn send_and_receive(

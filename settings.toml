@@ -17,7 +17,7 @@ port_numbers = ["22", "80", "443"]
 
 # Add the target IP addresses of packets.
 # Packets will be sent to a socket addressable by that IP address.
-# You can specifyx single IP addresses in a list.
+# You can specify single IP addresses in a list.
 # Alternatively, you may also specify a subnet like: ip_addresses = ["192.168.178.0/24"].
 ip_addresses = ["192.168.178.1"]
 

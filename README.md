@@ -68,7 +68,7 @@ A flood is a type of denial-of-service (DoS) attack in which a large volume of d
 
 | Method     | Details   |
 | :--------- | :-------- |
-| TCP Flood | Sends TCP packets to a target at a high rate. You may choose which TCP flags you want to set. TCP SYN initiates a connection to a socket by starting the three-way handshake without ever completing the connection. The target consumes resources waiting for half-open connections. TCP ACK prompts the target to earch its half-open connections for a match, which may eventually exhaust it by keeping it too busy to process other packets. Other flags may also be set at your leasure. |
+| TCP Flood | Sends TCP packets to a target at a high rate. You may choose which TCP flags you want to set. TCP SYN initiates a connection to a socket by starting the three-way handshake without ever completing the connection. The target consumes resources waiting for half-open connections. TCP ACK prompts the target to search its half-open connections for a match, which may eventually exhaust it by keeping it too busy to process other packets. Other flags can also be set at your discretion. |
 | UDP Flod | Sends UDP packets to a target at a high rate. The expected behavior is for the target to respond with ICMP destination unreachable packets after checking that no service listens at that port. The idea is that these packets consume a large amount of bandwidth that may prevent the target from providing other services. To avoid receiving ICMP packets back from the target, you can also spoof the IP address of the UDP packets sent. |
 | ICMP Flood | Sends ICMP echo packets, also known as pings, to a target at a high rate. The target may become too busy responding to these echo requests, resulting in the target being unable to provide other services. |
 
@@ -116,7 +116,7 @@ port_numbers = ["22", "80", "443"]
 
 # Add the target IP addresses of packets.
 # Packets will be sent to a socket addressable by that IP address.
-# You can specifyx single IP addresses in a list.
+# You can specify single IP addresses in a list.
 # Alternatively, you may also specify a subnet like: ip_addresses = ["192.168.178.0/24"].
 ip_addresses = ["192.168.178.1"]
 
