@@ -3,7 +3,6 @@ use crate::{
     flooder::tcp_flood::tcp_flood,
     networking::{interface::Interface, socket_iterator::SocketIterator},
 };
-use anyhow::Result;
 use futures::future::join_all;
 use log::info;
 use rand::Rng;
@@ -29,7 +28,7 @@ impl Flooder {
         port_numbers: &[u16],
         number_of_packets: usize,
         should_randomize_ports: bool,
-    ) -> Result<()> {
+    ) {
         let total_targets = ip_addresses.len();
         let total_ports = port_numbers.len();
 
@@ -92,7 +91,5 @@ impl Flooder {
             "There were {} errors while trying to flood the sockets.",
             errors
         );
-
-        Ok(())
     }
 }

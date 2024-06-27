@@ -35,13 +35,10 @@ pub fn icmp_flood(
 
     let packet = Icmp::build_icmp_packet(ipv4_src, ipv4_dest);
 
-    let packet_size = packet.len();
-
     DatalinkLayer::send_flood(
         iface,
         &packet,
         number_of_packets,
-        packet_size,
         dest_mac,
         EtherTypes::Ipv4,
     )?;

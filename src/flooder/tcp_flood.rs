@@ -11,7 +11,7 @@ use std::net::IpAddr;
 /// Sets the source IP address and port number of each packet to the specified values.
 ///
 /// Does not check if the target can be reached or if it responds.
-/// 
+///
 /// Uses TCP SYN flags by default. You can change the flags by modifying the `TcpFlags` parameter.
 pub fn tcp_flood(
     interface: Interface,
@@ -37,13 +37,10 @@ pub fn tcp_flood(
 
     let packet = Tcp::build_tcp_packet(ipv4_src, src_port, ipv4_dest, dest_port, TcpFlags::SYN);
 
-    let packet_size = packet.len();
-
     DatalinkLayer::send_flood(
         iface,
         &packet,
         number_of_packets,
-        packet_size,
         dest_mac,
         EtherTypes::Ipv4,
     )?;

@@ -35,13 +35,10 @@ pub fn udp_flood(
 
     let packet = Udp::build_udp_packet(ipv4_src, src_port, ipv4_dest, dest_port);
 
-    let packet_size = packet.len();
-
     DatalinkLayer::send_flood(
         iface,
         &packet,
         number_of_packets,
-        packet_size,
         dest_mac,
         EtherTypes::Ipv4,
     )?;

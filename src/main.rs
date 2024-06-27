@@ -164,7 +164,7 @@ async fn main() -> Result<()> {
                             input.number_of_packets,
                             input.should_randomize_ports,
                         )
-                        .await?;
+                        .await;
                     }
                 }
             }

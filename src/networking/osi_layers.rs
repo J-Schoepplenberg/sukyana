@@ -19,7 +19,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-const ETHERNET_BUFFER_SIZE: usize = 4096;
 const ETHERNET_HEADER_SIZE: usize = 14;
 
 /// Represents the different layers of the OSI model.
@@ -206,26 +205,8 @@ impl MatchLayer for TransportLayer {
 }
 
 impl DatalinkLayer {
-    /// Creates an Ethernet packet.
-    pub fn build_ethernet_packet(
-        src_mac: MacAddr,
-        dest_mac: MacAddr,
-        ethertype: EtherType,
-        payload: &[u8],
-    ) -> Vec<u8> {
-        let mut ethernet_buffer = [0u8; ETHERNET_BUFFER_SIZE];
-        let mut ethernet_packet = MutableEthernetPacket::new(&mut ethernet_buffer).unwrap();
-
-        ethernet_packet.set_source(src_mac);
-        ethernet_packet.set_destination(dest_mac);
-        ethernet_packet.set_ethertype(ethertype);
-        ethernet_packet.set_payload(payload);
-
-        ethernet_buffer[..(ETHERNET_HEADER_SIZE + payload.len())].to_vec()
-    }
-
     /// Mutates an Ethernet packet in-place.
-    pub fn mutate_ethernet_packet(
+    pub fn build_ethernet_packet(
         src_mac: MacAddr,
         dest_mac: MacAddr,
         ethertype: EtherType,
@@ -248,8 +229,8 @@ impl DatalinkLayer {
     pub fn send_and_receive(
         interface: NetworkInterface,
         dest_mac: MacAddr,
-        ethernet_type: EtherType,
-        packet: &[u8],
+        ethertype: EtherType,
+        payload: &[u8],
         layers: Layer,
         timeout: Duration,
     ) -> Result<(Option<Vec<u8>>, Duration)> {
@@ -266,14 +247,22 @@ impl DatalinkLayer {
             interface.mac.ok_or(ScannerError::CantFindInterfaceMac)?
         };
 
-        let ethernet_packet =
-            DatalinkLayer::build_ethernet_packet(src_mac, dest_mac, ethernet_type, packet);
+        let mut build_packet_fn = |packet: &mut [u8]| {
+            Self::build_ethernet_packet(src_mac, dest_mac, ethertype, payload, packet);
+        };
 
         let send_time = Instant::now();
 
-        sender
-            .send_to(&ethernet_packet, Some(interface))
-            .ok_or(ChannelError::SendError)??;
+        if sender
+            .build_and_send(
+                1,
+                ETHERNET_HEADER_SIZE + payload.len(),
+                &mut build_packet_fn,
+            )
+            .is_none()
+        {
+            return Err(ChannelError::SendError.into());
+        }
 
         let mut response_buffer = None;
 
@@ -286,9 +275,7 @@ impl DatalinkLayer {
             }
         }
 
-        let rtt = send_time.elapsed();
-
-        Ok((response_buffer, rtt))
+        Ok((response_buffer, send_time.elapsed()))
     }
 
     /// Sends a packet over a data link channel.
@@ -298,7 +285,6 @@ impl DatalinkLayer {
         interface: NetworkInterface,
         payload: &[u8],
         number_of_packets: usize,
-        packet_size: usize,
         dest_mac: MacAddr,
         ethertype: EtherType,
     ) -> Result<()> {
@@ -312,13 +298,13 @@ impl DatalinkLayer {
         let src_mac = interface.mac.ok_or(ScannerError::CantFindInterfaceMac)?;
 
         let mut build_packet = |packet: &mut [u8]| {
-            Self::mutate_ethernet_packet(src_mac, dest_mac, ethertype, payload, packet);
+            Self::build_ethernet_packet(src_mac, dest_mac, ethertype, payload, packet);
         };
 
         if sender
             .build_and_send(
                 number_of_packets,
-                ETHERNET_HEADER_SIZE + packet_size,
+                ETHERNET_HEADER_SIZE + payload.len(),
                 &mut build_packet,
             )
             .is_none()
@@ -332,7 +318,7 @@ impl DatalinkLayer {
 
 impl NetworkLayer {
     /// Hands over the packet to the data link layer.
-    /// 
+    ///
     /// Converts the interface to a `pnet::datalink::NetworkInterface`, which will be consumed by the data link layer.
     ///
     /// Returns the response and the round-trip time.
@@ -365,6 +351,24 @@ mod tests {
     use crate::networking::tcp::Tcp;
     use pnet::packet::tcp::TcpFlags;
     use std::net::Ipv4Addr;
+
+    /// Creates an Ethernet packet.
+    fn build_ethernet_packet(
+        src_mac: MacAddr,
+        dest_mac: MacAddr,
+        ethertype: EtherType,
+        payload: &[u8],
+    ) -> Vec<u8> {
+        let mut ethernet_buffer = [0u8; 4096];
+        let mut ethernet_packet = MutableEthernetPacket::new(&mut ethernet_buffer).unwrap();
+
+        ethernet_packet.set_source(src_mac);
+        ethernet_packet.set_destination(dest_mac);
+        ethernet_packet.set_ethertype(ethertype);
+        ethernet_packet.set_payload(payload);
+
+        ethernet_buffer[..(ETHERNET_HEADER_SIZE + payload.len())].to_vec()
+    }
 
     #[test]
     fn test_layers_match() {
@@ -401,8 +405,7 @@ mod tests {
         // The packet should match all layers.
         let tcp_packet_1 =
             Tcp::build_tcp_packet(src_ip, src_port, dest_ip, dest_port, TcpFlags::SYN);
-        let ethernet_packet_1 =
-            DatalinkLayer::build_ethernet_packet(src_mac, dest_mac, ethertype, &tcp_packet_1);
+        let ethernet_packet_1 = build_ethernet_packet(src_mac, dest_mac, ethertype, &tcp_packet_1);
         assert!(transport_layer.match_packet(&ethernet_packet_1));
 
         // The packet should not match anymore since src_ip and dest_port are different.
@@ -413,8 +416,7 @@ mod tests {
             443,
             TcpFlags::SYN,
         );
-        let ethernet_packet_2 =
-            DatalinkLayer::build_ethernet_packet(src_mac, dest_mac, ethertype, &tcp_packet_2);
+        let ethernet_packet_2 = build_ethernet_packet(src_mac, dest_mac, ethertype, &tcp_packet_2);
         assert!(!transport_layer.match_packet(&ethernet_packet_2));
     }
 }
