@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
                 tcp_maimon,
                 udp,
             } => {
-                let scan_methods = vec![
+                let scan_methods = [
                     (*tcp_syn, ScanMethod::TcpSyn),
                     (*tcp_connect, ScanMethod::TcpConnect),
                     (*tcp_ack, ScanMethod::TcpAck),
@@ -146,7 +146,7 @@ async fn main() -> Result<()> {
                 }
             }
             Commands::Flood { tcp, udp, icmp } => {
-                let flood_methods = vec![
+                let flood_methods = [
                     (*tcp, FloodMethod::Tcp),
                     (*udp, FloodMethod::Udp),
                     (*icmp, FloodMethod::Icmp),

@@ -297,7 +297,7 @@ impl DatalinkLayer {
 
         let src_mac = interface.mac.ok_or(ScannerError::CantFindInterfaceMac)?;
 
-        let mut build_packet = |packet: &mut [u8]| {
+        let mut build_packet_fn = |packet: &mut [u8]| {
             Self::build_ethernet_packet(src_mac, dest_mac, ethertype, payload, packet);
         };
 
@@ -305,7 +305,7 @@ impl DatalinkLayer {
             .build_and_send(
                 number_of_packets,
                 ETHERNET_HEADER_SIZE + payload.len(),
-                &mut build_packet,
+                &mut build_packet_fn,
             )
             .is_none()
         {
