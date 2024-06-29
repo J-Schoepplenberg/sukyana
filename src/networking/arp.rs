@@ -66,7 +66,7 @@ impl Arp {
         let layer = Layer::Three(network_layer);
 
         let (response, rtt) = DatalinkLayer::send_and_receive(
-            iface,
+            &iface,
             MacAddr::broadcast(),
             ethernet_type,
             &arp_packet,

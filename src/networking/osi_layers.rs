@@ -227,7 +227,7 @@ impl DatalinkLayer {
     ///
     /// Returns a matching response and the round-trip time.
     pub fn send_and_receive(
-        interface: NetworkInterface,
+        interface: &NetworkInterface,
         dest_mac: MacAddr,
         ethertype: EtherType,
         payload: &[u8],
@@ -327,7 +327,7 @@ impl NetworkLayer {
         let iface = interface.convert_interface()?;
 
         let (response, rtt) = DatalinkLayer::send_and_receive(
-            iface,
+            &iface,
             dest_mac,
             EtherTypes::Ipv4,
             packet,
