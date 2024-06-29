@@ -3,7 +3,7 @@ A low-level port scanner and packet flooder written in pure, safe Rust.
 
 The code is based on
  
- > Gordon Fyodor Lyon, Nmap network scanning : official Nmap project guide to network discovery and security scanning. Sunnyvale, Ca: Insecure.com, Llc, 2008. Available: https://nmap.org/book/toc.html.
+ > Gordon Fyodor Lyon, Nmap network scanning: official Nmap project guide to network discovery and security scanning. Sunnyvale, Ca: Insecure.com, Llc, 2008. Available: https://nmap.org/book/toc.html.
 
 The logic for interpreting host responses to probes has been implemented according to the [nmap documentation](https://nmap.org/book/scan-methods.html).
 

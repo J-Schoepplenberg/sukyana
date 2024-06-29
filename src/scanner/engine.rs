@@ -11,7 +11,7 @@ use crate::{
         udp_scan::udp_scan,
     },
 };
-use futures::future::join_all;
+use futures::{stream::FuturesUnordered, StreamExt};
 use log::info;
 use pnet::util::MacAddr;
 use std::{
@@ -58,6 +58,8 @@ impl Scanner {
         port_numbers: &[u16],
         timeout: Duration,
     ) -> Vec<(SocketAddr, ScanResult, Duration)> {
+        let total_sockets = ip_addresses.len() * port_numbers.len();
+
         let sockets = SocketIterator::new(ip_addresses, port_numbers);
 
         let scan_method = match method {
@@ -72,39 +74,34 @@ impl Scanner {
             ScanMethod::Udp => udp_scan,
         };
 
-        let mut handles = Vec::new();
-        let mut total_sockets = 0;
+        // Set of futures that complete in any order.
+        // See: https://github.com/tokio-rs/tokio/issues/5564 -> faster than tokio's JoinSet.
+        let mut futures = FuturesUnordered::new();
 
-        for socket in sockets {
-            let handle = tokio::spawn(async move {
-                let status = tokio::task::spawn_blocking(move || {
-                    scan_method(
-                        interface,
-                        src_ip,
-                        src_port,
-                        socket.ip(),
-                        socket.port(),
-                        timeout,
-                    )
-                })
-                .await
-                .unwrap();
-                (socket, status)
-            });
-            handles.push(handle);
-            total_sockets += 1;
-        }
-
-        let results = join_all(handles).await;
+        sockets.for_each(|socket| {
+            // Run the scan for each socket in a separate blocking thread.
+            // This is a limitation introduced by the pnet crate, which does not support async.
+            futures.push(tokio::task::spawn_blocking(move || {
+                scan_method(
+                    interface,
+                    src_ip,
+                    src_port,
+                    socket.ip(),
+                    socket.port(),
+                    timeout,
+                )
+                .map(|scan| (socket, scan))
+            }));
+        });
 
         let mut scanned_sockets = Vec::new();
         let mut unreachable = 0;
         let mut responses = 0;
 
-        for result in results {
+        while let Some(result) = futures.next().await {
             match result {
-                Ok((dest_ip, Ok((status, rtt)))) => {
-                    scanned_sockets.push((dest_ip, status, rtt));
+                Ok(Ok((socket, (scan, rtt)))) => {
+                    scanned_sockets.push((socket, scan, rtt));
                     responses += 1;
                 }
                 _ => {
@@ -134,30 +131,22 @@ impl Scanner {
     ) -> Vec<(IpAddr, ScanResult, Duration)> {
         let total_hosts = ip_addresses.len();
 
-        let handles: Vec<_> = ip_addresses
-            .into_iter()
-            .map(|dest_ip| {
-                tokio::spawn(async move {
-                    let status = tokio::task::spawn_blocking(move || {
-                        icmp_scan(interface, src_ip, dest_ip, timeout)
-                    })
-                    .await
-                    .unwrap();
-                    (dest_ip, status)
-                })
-            })
-            .collect();
-
-        let results = join_all(handles).await;
-
         let mut hosts = Vec::new();
         let mut unreachable = 0;
         let mut responses = 0;
 
-        for result in results {
+        let mut futures = FuturesUnordered::new();
+
+        ip_addresses.into_iter().for_each(|dest_ip| {
+            futures.push(tokio::task::spawn_blocking(move || {
+                icmp_scan(interface, src_ip, dest_ip, timeout).map(|scan| (dest_ip, scan))
+            }));
+        });
+
+        while let Some(result) = futures.next().await {
             match result {
-                Ok((dest_ip, Ok((status, rtt)))) => {
-                    hosts.push((dest_ip, status, rtt));
+                Ok(Ok((dest_ip, (scan, rtt)))) => {
+                    hosts.push((dest_ip, scan, rtt));
                     responses += 1;
                 }
                 _ => {
@@ -187,31 +176,23 @@ impl Scanner {
     ) -> Vec<(IpAddr, MacAddr, Duration)> {
         let total_hosts = ip_addresses.len();
 
-        let handles: Vec<_> = ip_addresses
-            .into_iter()
-            .map(|dest_ip| {
-                tokio::spawn(async move {
-                    let status = tokio::task::spawn_blocking(move || {
-                        arp_scan(interface, src_ip, dest_ip, timeout)
-                    })
-                    .await
-                    .unwrap();
-                    (dest_ip, status)
-                })
-            })
-            .collect();
-
-        let results = join_all(handles).await;
-
         let mut hosts = Vec::new();
         let mut unreachable = 0;
         let mut responses = 0;
 
-        for result in results {
+        let mut futures = FuturesUnordered::new();
+
+        ip_addresses.into_iter().for_each(|dest_ip| {
+            futures.push(tokio::task::spawn_blocking(move || {
+                arp_scan(interface, src_ip, dest_ip, timeout).map(|scan| (dest_ip, scan))
+            }));
+        });
+
+        while let Some(result) = futures.next().await {
             match result {
-                Ok((dest_ip, Ok((Some(mac), rtt)))) => {
-                    responses += 1;
+                Ok(Ok((dest_ip, (Some(mac), rtt)))) => {
                     hosts.push((dest_ip, mac, rtt));
+                    responses += 1;
                 }
                 _ => {
                     unreachable += 1;

@@ -3,7 +3,7 @@ use crate::{
     flooder::tcp_flood::tcp_flood,
     networking::{interface::Interface, socket_iterator::SocketIterator},
 };
-use futures::future::join_all;
+use futures::{stream::FuturesUnordered, StreamExt};
 use log::info;
 use rand::Rng;
 use std::net::IpAddr;
@@ -31,6 +31,7 @@ impl Flooder {
     ) {
         let total_targets = ip_addresses.len();
         let total_ports = port_numbers.len();
+        let total_packets = total_ports * number_of_packets;
 
         let sockets = SocketIterator::new(ip_addresses, port_numbers);
 
@@ -40,9 +41,9 @@ impl Flooder {
             FloodMethod::Icmp => icmp_flood,
         };
 
-        let mut handles = Vec::new();
+        let mut futures = FuturesUnordered::new();
 
-        for socket in sockets {
+        sockets.for_each(|socket| {
             let origin_port = if !should_randomize_ports {
                 src_port
             } else {
@@ -50,40 +51,31 @@ impl Flooder {
                 rng.gen_range(1..=65535)
             };
 
-            let handle = tokio::spawn(async move {
-                let status = tokio::task::spawn_blocking(move || {
-                    flood_method(
-                        interface,
-                        src_ip,
-                        origin_port,
-                        socket.ip(),
-                        socket.port(),
-                        number_of_packets,
-                    )
-                })
-                .await
-                .unwrap();
-                (socket, status)
-            });
-
-            handles.push(handle);
-        }
-
-        let results = join_all(handles).await;
+            futures.push(tokio::task::spawn_blocking(move || {
+                flood_method(
+                    interface,
+                    src_ip,
+                    origin_port,
+                    socket.ip(),
+                    socket.port(),
+                    number_of_packets,
+                )
+                .map(|scan| (socket, scan))
+            }))
+        });
 
         let mut errors = 0;
 
-        for result in results {
+        while let Some(result) = futures.next().await {
             match result {
-                Ok(_) => (),
+                Ok(Ok(_)) => (),
                 Err(_) => errors += 1,
+                _ => (),
             }
         }
 
-        let total_packets = total_ports * number_of_packets;
-
         info!(
-            "Flooded {} targets with {} packets each.",
+            "Flooded {} target(s) with {} packets each.",
             total_targets, total_packets
         );
 
