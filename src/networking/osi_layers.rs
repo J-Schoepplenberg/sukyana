@@ -253,16 +253,13 @@ impl DatalinkLayer {
 
         let send_time = Instant::now();
 
-        if sender
+        sender
             .build_and_send(
                 1,
                 ETHERNET_HEADER_SIZE + payload.len(),
                 &mut build_packet_fn,
             )
-            .is_none()
-        {
-            return Err(ChannelError::SendError.into());
-        }
+            .ok_or(ChannelError::SendError)??;
 
         let mut response_buffer = None;
 
@@ -301,16 +298,13 @@ impl DatalinkLayer {
             Self::build_ethernet_packet(src_mac, dest_mac, ethertype, payload, packet);
         };
 
-        if sender
+        sender
             .build_and_send(
                 number_of_packets,
                 ETHERNET_HEADER_SIZE + payload.len(),
                 &mut build_packet_fn,
             )
-            .is_none()
-        {
-            return Err(ChannelError::SendError.into());
-        }
+            .ok_or(ChannelError::SendError)??;
 
         Ok(())
     }

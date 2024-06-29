@@ -75,7 +75,7 @@ impl Scanner {
         };
 
         // Set of futures that complete in any order.
-        // See: https://github.com/tokio-rs/tokio/issues/5564 -> faster than tokio's JoinSet.
+        // See: https://github.com/tokio-rs/tokio/issues/5564 -> faster than JoinSet.
         let mut futures = FuturesUnordered::new();
 
         sockets.for_each(|socket| {
