@@ -61,8 +61,8 @@ impl Tcp {
         ip_packet
     }
 
-    /// Sends a TCP SYN packet and parses the response.
-    ///
+    /// Sends a TCP packet with the given `TcpFlags`.
+    /// 
     /// The packet is handed over to the network layer.
     pub fn send_tcp_packet(
         interface: Interface,

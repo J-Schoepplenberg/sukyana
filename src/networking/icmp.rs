@@ -69,7 +69,7 @@ impl Icmp {
         ip_packet
     }
 
-    /// Sends an ICMP packet and parses the response.
+    /// Sends an ICMP packet.
     ///
     /// The packet is handed over to the transport layer.
     pub fn send_icmp_packet(
