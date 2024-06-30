@@ -100,6 +100,7 @@ impl Interface {
 
 /// Represents a gateway which is associated with an interface.
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
 pub struct Gateway {
     pub ip: Ipv4Addr,
     pub mac: MacAddr,

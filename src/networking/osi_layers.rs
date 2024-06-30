@@ -234,7 +234,7 @@ impl DatalinkLayer {
         layers: Layer,
         timeout: Duration,
     ) -> Result<(Option<Vec<u8>>, Duration)> {
-        let channel = datalink::channel(&interface, Default::default())?;
+        let channel = datalink::channel(interface, Default::default())?;
 
         let (mut sender, mut receiver) = match channel {
             Channel::Ethernet(tx, rx) => (tx, rx),
