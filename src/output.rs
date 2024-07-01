@@ -1,7 +1,12 @@
 use crate::{errors::ScannerError, scanner::engine::ScanResult};
 use anyhow::Result;
 use pnet::util::MacAddr;
-use std::{env, io::Write, net::{IpAddr, SocketAddr}, time::Duration};
+use std::{
+    env,
+    io::Write,
+    net::{IpAddr, SocketAddr},
+    time::Duration,
+};
 use tokio::{fs::File, io::AsyncWriteExt};
 
 pub trait ToCsv {
@@ -43,7 +48,7 @@ pub async fn save_scan_results<T: ToCsv>(hosts: Vec<T>, file_name: &str) -> Resu
     let output_path = env::current_dir()?.join(file_name);
     let mut file = File::create(&output_path).await?;
 
-    let mut buffer = Vec::new();
+    let mut buffer = Vec::with_capacity(hosts.len());
     writeln!(buffer, "{}", T::header())?;
     for host in hosts {
         writeln!(buffer, "{}", host.to_csv())?;
@@ -57,7 +62,7 @@ pub async fn save_scan_results<T: ToCsv>(hosts: Vec<T>, file_name: &str) -> Resu
         .ok_or_else(|| ScannerError::CouldNotWriteResults.into())
 }
 
-pub async fn save_port_scan_results(hosts: Vec<(SocketAddr, ScanResult, Duration)>) -> Result<String> {
+pub async fn save_port_results(hosts: Vec<(SocketAddr, ScanResult, Duration)>) -> Result<String> {
     save_scan_results(hosts, "port_scan_results.csv").await
 }
 

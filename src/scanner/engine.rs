@@ -94,7 +94,7 @@ impl Scanner {
             }));
         });
 
-        let mut scanned_sockets = Vec::new();
+        let mut scanned_sockets = Vec::with_capacity(total_sockets);
         let mut unreachable = 0;
         let mut responses = 0;
 
@@ -131,7 +131,7 @@ impl Scanner {
     ) -> Vec<(IpAddr, ScanResult, Duration)> {
         let total_hosts = ip_addresses.len();
 
-        let mut hosts = Vec::new();
+        let mut hosts = Vec::with_capacity(total_hosts);
         let mut unreachable = 0;
         let mut responses = 0;
 
@@ -176,7 +176,7 @@ impl Scanner {
     ) -> Vec<(IpAddr, MacAddr, Duration)> {
         let total_hosts = ip_addresses.len();
 
-        let mut hosts = Vec::new();
+        let mut hosts = Vec::with_capacity(total_hosts);
         let mut unreachable = 0;
         let mut responses = 0;
 

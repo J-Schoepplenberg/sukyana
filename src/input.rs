@@ -22,7 +22,7 @@ pub fn load_config(path: &str) -> Result<Input> {
 }
 
 pub fn parse_port_numbers(ports: Vec<String>) -> Result<Vec<u16>> {
-    let mut port_numbers = Vec::new();
+    let mut port_numbers = Vec::with_capacity(ports.len());
     for port in ports {
         if port.contains('-') {
             let range = port.split('-').collect::<Vec<&str>>();
@@ -37,7 +37,7 @@ pub fn parse_port_numbers(ports: Vec<String>) -> Result<Vec<u16>> {
 }
 
 pub fn parse_ip_addresses(ips: Vec<String>) -> Result<Vec<IpAddr>> {
-    let mut ip_addresses = Vec::new();
+    let mut ip_addresses = Vec::with_capacity(ips.len());
     for ip in ips {
         if ip.contains('/') {
             let subnet = Ipv4Pool::from(&ip)?;

@@ -234,18 +234,12 @@ impl DatalinkLayer {
         layers: Layer,
         timeout: Duration,
     ) -> Result<(Option<Vec<u8>>, Duration)> {
-        let channel = datalink::channel(interface, Default::default())?;
-
-        let (mut sender, mut receiver) = match channel {
+        let (mut sender, mut receiver) = match datalink::channel(interface, Default::default())? {
             Channel::Ethernet(tx, rx) => (tx, rx),
             _ => return Err(ChannelError::UnexpectedChannelType.into()),
         };
 
-        let src_mac = if dest_mac == MacAddr::zero() {
-            MacAddr::zero()
-        } else {
-            interface.mac.ok_or(ScannerError::CantFindInterfaceMac)?
-        };
+        let src_mac = interface.mac.ok_or(ScannerError::CantFindInterfaceMac)?;
 
         let mut build_packet_fn = |packet: &mut [u8]| {
             Self::build_ethernet_packet(src_mac, dest_mac, ethertype, payload, packet);
@@ -261,18 +255,17 @@ impl DatalinkLayer {
             )
             .ok_or(ChannelError::SendError)??;
 
-        let mut response_buffer = None;
+        let deadline = send_time + timeout;
 
-        while send_time.elapsed() < timeout {
+        while Instant::now() < deadline {
             if let Ok(response) = receiver.next() {
                 if layers.match_layer(response) {
-                    response_buffer = Some(response.to_vec());
-                    break;
+                    return Ok((Some(response.to_vec()), send_time.elapsed()));
                 }
             }
         }
 
-        Ok((response_buffer, send_time.elapsed()))
+        Ok((None, send_time.elapsed()))
     }
 
     /// Sends a packet over a data link channel.
@@ -285,9 +278,7 @@ impl DatalinkLayer {
         dest_mac: MacAddr,
         ethertype: EtherType,
     ) -> Result<()> {
-        let channel = datalink::channel(&interface, Default::default())?;
-
-        let (mut sender, mut _receiver) = match channel {
+        let (mut sender, mut _receiver) = match datalink::channel(&interface, Default::default())? {
             Channel::Ethernet(tx, rx) => (tx, rx),
             _ => return Err(ChannelError::UnexpectedChannelType.into()),
         };
@@ -313,7 +304,7 @@ impl DatalinkLayer {
 impl NetworkLayer {
     /// Hands over the packet to the data link layer.
     ///
-    /// Converts the interface to a `pnet::datalink::NetworkInterface`, which will be consumed by the data link layer.
+    /// Converts the interface to a `pnet::datalink::NetworkInterface`.
     ///
     /// Returns the response and the round-trip time.
     pub fn send_and_receive(

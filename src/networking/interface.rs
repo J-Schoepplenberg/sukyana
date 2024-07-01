@@ -15,6 +15,8 @@ cfg_if::cfg_if! {
     }
 }
 
+const MAX_INTERFACE_NAME_LENTGH: usize = 256;
+
 /// Represents a network interface with an IP address, MAC address, and gateway.
 ///
 /// Retrieving the list of all interfaces in every tokio task to determine which
@@ -30,7 +32,7 @@ cfg_if::cfg_if! {
 #[derive(Clone, Copy, Debug)]
 pub struct Interface {
     pub index: u32,
-    pub name: [u8; 256],
+    pub name: [u8; MAX_INTERFACE_NAME_LENTGH],
     pub ip: Ipv4Net,
     pub mac: MacAddr,
     pub flags: u32,
@@ -58,7 +60,7 @@ impl Interface {
             index: interface.index,
             name,
             ip,
-            mac: convert_mac_addr(mac),
+            mac: convert_mac_address(mac),
             flags: interface.flags,
             gateway,
         };
@@ -66,16 +68,19 @@ impl Interface {
     }
 
     /// Converts a string to a fixed-size 256 byte array.
-    pub fn string_to_fixed_bytes(s: &str) -> [u8; 256] {
-        let mut bytes = [0u8; 256];
-        let len = s.len().min(256);
+    pub fn string_to_fixed_bytes(s: &str) -> [u8; MAX_INTERFACE_NAME_LENTGH] {
+        let mut bytes = [0u8; MAX_INTERFACE_NAME_LENTGH];
+        let len = s.len().min(MAX_INTERFACE_NAME_LENTGH);
         bytes[..len].copy_from_slice(&s.as_bytes()[..len]);
         bytes
     }
 
     /// Converts a fixed-size 256 byte array to a string.
-    pub fn fixed_bytes_to_string(bytes: &[u8; 256]) -> String {
-        let len = bytes.iter().position(|&b| b == 0).unwrap_or(256);
+    pub fn fixed_bytes_to_string(bytes: &[u8; MAX_INTERFACE_NAME_LENTGH]) -> String {
+        let len = bytes
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(MAX_INTERFACE_NAME_LENTGH);
         String::from_utf8_lossy(&bytes[..len]).to_string()
     }
 
@@ -88,7 +93,7 @@ impl Interface {
                 NAME_PREFIX,
                 Interface::fixed_bytes_to_string(&self.name)
             ),
-            description: "".to_string(),
+            description: String::new(),
             mac: Some(self.mac),
             ips: vec![pnet::ipnetwork::IpNetwork::V4(
                 pnet::ipnetwork::Ipv4Network::new(self.ip.addr, self.ip.prefix_len)?,
@@ -113,13 +118,13 @@ impl Gateway {
             .ipv4
             .first()
             .ok_or(ScannerError::CantFindGatewayIp)?;
-        let mac = convert_mac_addr(gateway.mac_addr);
+        let mac = convert_mac_address(gateway.mac_addr);
         Ok(Gateway { ip: *ip, mac })
     }
 }
 
 /// Converts `netdev::mac::MacAddr` to `pnet::util::MacAddr`.
-pub fn convert_mac_addr(mac: netdev::mac::MacAddr) -> pnet::util::MacAddr {
+pub fn convert_mac_address(mac: netdev::mac::MacAddr) -> pnet::util::MacAddr {
     pnet::util::MacAddr(mac.0, mac.1, mac.2, mac.3, mac.4, mac.5)
 }
 
