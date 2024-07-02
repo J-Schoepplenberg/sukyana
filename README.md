@@ -1,7 +1,7 @@
 # Sukyana
 A low-level, cross-platform port scanner and packet flooder written in pure, safe Rust.
 
-Runs on any operating system. See [Windows](#windows) for requirements for building on Windows.
+Runs on any operating system. See the [requirements](#windows) for building on Windows.
 
 The code is based on
  
@@ -190,7 +190,7 @@ Replace `<CONFIG>` with the actual path to your configuration file. The `[OPTION
 ### Windows
 To compile `Sukyana` you need to fulfill the requirements that are introduced through `libpnet`. These are namely:
 - You must use a version of Rust which uses the MSVC toolchain
-- You must have WinPcap or npcap installed
+- You must have [WinPcap](https://www.winpcap.org/) or [npcap](https://npcap.com/) installed
 - You must place `Packet.lib` from the [WinPcap Developers pack](https://www.winpcap.org/devel.htm "WinPcap Developers pack") directly in the root of this repository
   - For x64 (64-bit) systems you find the file in `WpdPack/Lib/x64/Packet.lib`
   - For x86 (32-bit) systems you find the file in `WpdPack/Lib/Packet.lib`
