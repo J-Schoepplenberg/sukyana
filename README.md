@@ -1,7 +1,7 @@
 # Sukyana
 A low-level, cross-platform port scanner and packet flooder written in pure, safe Rust.
 
-Runs on any operating system. Works with the latest stable release of Rust. See [Windows](#windows) for requirements for building on Windows.
+Runs on any operating system. See [Windows](#windows) for requirements for building on Windows.
 
 The code is based on
  
