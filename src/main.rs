@@ -5,7 +5,7 @@ use flooder::engine::{FloodMethod, Flooder};
 use input::{load_config, parse_ip_addresses, parse_port_numbers};
 use log::{error, info};
 use networking::interface::Interface;
-use output::{save_arp_results, save_icmp_results, save_port_scan_results};
+use output::{save_arp_results, save_icmp_results, save_port_results};
 use rand::seq::SliceRandom;
 use scanner::engine::{ScanMethod, Scanner};
 mod errors;
@@ -138,7 +138,7 @@ async fn main() -> Result<()> {
                             timeout,
                         )
                         .await;
-                        match save_port_scan_results(hosts).await {
+                        match save_port_results(hosts).await {
                             Ok(path) => info!("Port scan results saved to: {}.", path),
                             Err(e) => error!("Failed to save port scan results: {}", e),
                         }
