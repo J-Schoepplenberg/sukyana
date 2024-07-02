@@ -1,5 +1,7 @@
 # Sukyana
-A low-level port scanner and packet flooder written in pure, safe Rust.
+A low-level, cross-platform port scanner and packet flooder written in pure, safe Rust.
+
+Runs on any operating system. Works with the latest stable release of Rust. See [Windows](#windows) for requirements for building on Windows.
 
 The code is based on
  
@@ -194,10 +196,10 @@ To compile `Sukyana` you need to fulfill the requirements that are introduced th
   - For x86 (32-bit) systems you find the file in `WpdPack/Lib/Packet.lib`
 
 ## Roadmap
-- [ ] Automatic remote detection of operating systems and services.
+- [x] Ensure complete cross-platform support.
+- [ ] Add more and advanced DoS attack methods.
 - [ ] Default scanning of top 1000 most common ports.
-- [ ] Ensure complete cross-platform support.
-- [ ] Add more DoS attack methods.
+- [ ] Automatic remote detection of operating systems and services.
 
 ## Legal Disclaimer
 The code provided in this repository is for educational and research purposes only. `Sukyana` has been written solely to aid in the understanding of low-level networking and network security. It should only be used for legitimate purposes, such as testing the security of your own systems or systems that you have explicit permission to test from the owner. Make sure you have proper authorization before using `Sukyana` to scan or test any network, system, or device. Unauthorized use against any system or network is strictly prohibited and may be illegal. The author of `Sukyana` is not responsible or liable for any misuse. You acknowledge and agree that you are solely responsible for your use of the code in this repository. This disclaimer must be included in all copies or distributions of this repository, and by downloading or using `Sukyana` you agree to be bound by the above terms.
