@@ -1,7 +1,7 @@
 [package]
 name = "sukyana"
 version = "1.0.2"
-authors = ["Jannis Schoepplenberg <jschoe@proton.me>"]
+authors = ["Jannis Schoepplenberg"]
 description = "A low-level port scanner and flooder written in pure, safe Rust."
 keywords = ["networking", "cybersecurity", "port-scanner", "flooder", "network-security"]
 categories = ["cybersecurity", "networking", "port-scanning", "flooding", "network-security"]
